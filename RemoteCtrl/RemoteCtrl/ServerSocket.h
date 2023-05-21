@@ -3,7 +3,25 @@
 #include "pch.h"
 #include "framework.h"
 
-#define SERV_PORT	9527
+#define SERV_PORT	9527	// 端口号
+#define BUFFER_SIZE	4096	// 缓冲区大小
+
+// 解析网络数据包
+class CPacket
+{
+public:
+	CPacket() : head(0), length(0), cmd(0), sum(0) {}
+	CPacket(const BYTE* pdata, size_t& size, CPacket& packet);
+	~CPacket() {}
+public:
+	WORD head;			// 包头 固定为: 0xFE FF		2字节
+	DWORD length;		// 包的长度,从控制命令开始到 和校验结束	4字节
+	WORD cmd;			// 控制命令	2字节
+	std::string data;	// 包的数据	
+	WORD sum;			// 和校验	2字节
+};
+
+
 
 class CServerSocket
 {
@@ -16,47 +34,13 @@ public:
 	}
 
 	/* 初始化socket */
-	bool InitSocket()
-	{
-		if (m_socket == -1) return false;
-		sockaddr_in serv_adr;
-		memset(&serv_adr, 0, sizeof(serv_adr));
-		serv_adr.sin_family = AF_INET;	// IPV_4
-		serv_adr.sin_addr.s_addr = INADDR_ANY;
-		serv_adr.sin_port = htons(SERV_PORT);
-
-		// 绑定端口号和地址
-		if (bind(m_socket, (sockaddr*)&serv_adr, sizeof(serv_adr) == -1))
-			return false;
-		if (listen(m_socket, 1) == -1)
-			return false;
-		return true;
-	}
+	bool InitSocket();
 
 	/* 接收客户端连接 */
-	bool AcceptClient()
-	{
-		sockaddr_in client_adr;
-		int cli_sz = sizeof(client_adr);
-		m_client = accept(m_socket, (sockaddr*)&client_adr, &cli_sz);
-		if (m_client == -1)
-			return false;
-		return true;
-	}
+	bool AcceptClient();
 
-	/*  */
-	int DealCommand()
-	{
-		if (m_client == INVALID_SOCKET) return false;
-		char buffer[1024];
-		while (true)
-		{
-			int len = recv(m_client, buffer, sizeof(buffer), 0);
-			if (len <= 0)
-				return -1;
-			// TODO: 处理命令
-		}
-	}
+	/* 处理客户端发送的命令 */
+	int DealCommand();
 
 	/*  */
 	bool SendData(const char* data, size_t size)
@@ -124,6 +108,7 @@ private:
 // 成员变量
 	SOCKET m_socket = INVALID_SOCKET;	// 监听套接字
 	SOCKET m_client = INVALID_SOCKET;	// 客户端套接字
+	CPacket m_packet;
 
 	static CServerSocket* m_instance;
 	static CHelper m_helper;

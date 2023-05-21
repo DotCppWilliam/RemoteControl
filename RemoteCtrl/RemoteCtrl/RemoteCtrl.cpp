@@ -9,7 +9,14 @@
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #endif
-  
+
+// 设置入口点为 mainCRTStartup, 子系统设置为 windows.则没有窗口,在后台运行
+
+//#pragma comment(linker, "/subsystem:windows /entry:WinMainCRTStartup")
+//#pragma comment(linker, "/subsystem:windows /entry:mainCRTStartup") // 控制台
+//#pragma comment(linker, "/subsystem:console /entry:mainCRTStartup")
+//#pragma comment(linker, "/subsystem:console /entry:WinMainCRTStartup")
+//#pragma comment(linker, "/SUBSYSTEM:WINDOWS /ENTRY:mainCRTStartup")
 
 // 唯一的应用程序对象
 
