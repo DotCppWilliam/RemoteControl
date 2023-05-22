@@ -4,14 +4,13 @@
 CServerSocket* CServerSocket::m_instance = nullptr;
 CServerSocket::CHelper CServerSocket::m_helper;
 
-
 CPacket::CPacket(const BYTE* pdata, size_t& size, CPacket& packet)
 {
 	size_t i = 0;
 	// 找到包头位置
 	for (; i < size; i++)
 	{
-		if (*(WORD*)(pdata + i) == 0xFEFF)
+		if (*(WORD*)(pdata + i) == PACK_HEAD)
 		{
 			// 1. 解析包头
 			packet.head = *(WORD*)(pdata + i);
@@ -69,6 +68,8 @@ CPacket::CPacket(const BYTE* pdata, size_t& size, CPacket& packet)
 	// 校验和匹配失败,解析失败
 	size = 0;
 }
+//#pragma pack(pop)
+
 
 /* 初始化socket */
 bool CServerSocket::InitSocket()

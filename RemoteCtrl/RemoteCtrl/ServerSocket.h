@@ -6,22 +6,53 @@
 #define SERV_PORT	9527	// 端口号
 #define BUFFER_SIZE	4096	// 缓冲区大小
 
+#define PACK_HEAD	0xFEFF	// 包头两字节的内容
+
+#pragma pack(push)	// 保存对齐的长度到栈中
+#pragma pack(1)		// 对齐长度为1
 // 解析网络数据包
 class CPacket
 {
 public:
 	CPacket() : head(0), length(0), cmd(0), sum(0) {}
 	CPacket(const BYTE* pdata, size_t& size, CPacket& packet);
+	CPacket(WORD _cmd, const BYTE* pdata, size_t size)
+		: head(0), length(0), cmd(0), sum(0)
+	{
+		head = PACK_HEAD;
+		length = size + 4;
+		cmd = _cmd;
+		data.resize(size);
+		memcpy((BYTE*)data.c_str(), pdata, size);
+
+		sum = 0;
+		for (int i = 0; i < size; i++)
+			sum += (BYTE)pdata[i] & 0xFF;
+	}
 	~CPacket() {}
+
+	int size() { return length + 6; }	// 返回整个包的大小
+	const char* packData()	// 返回一个包含整个包的数据,没有其他无用的东西
+	{
+		pack_data.resize(size());
+		BYTE* ptr = (BYTE*)pack_data.c_str();
+		*(WORD*)ptr = head; ptr += 2;
+		*(DWORD*)ptr = length; ptr += 4;
+		memcpy(ptr, data.c_str(), data.size()); ptr += data.size();
+		*(WORD*)ptr = sum;
+
+		return pack_data.c_str();
+	}
+
 public:
 	WORD head;			// 包头 固定为: 0xFE FF		2字节
 	DWORD length;		// 包的长度,从控制命令开始到 和校验结束	4字节
 	WORD cmd;			// 控制命令	2字节
 	std::string data;	// 包的数据	
 	WORD sum;			// 和校验	2字节
+	std::string pack_data;	// 存储整个包的所有数据
 };
-
-
+#pragma pack(pop)	// 恢复为原来的对齐长度
 
 class CServerSocket
 {
@@ -33,6 +64,7 @@ public:
 		return m_instance;
 	}
 
+
 	/* 初始化socket */
 	bool InitSocket();
 
@@ -42,11 +74,17 @@ public:
 	/* 处理客户端发送的命令 */
 	int DealCommand();
 
-	/*  */
+	/* 发送数据 */
 	bool SendData(const char* data, size_t size)
 	{
 		if (m_client == INVALID_SOCKET) return false;
 		return send(m_client, data, size, 0) > 0;
+	}
+
+	bool SendData(CPacket& packet)
+	{
+		if (m_client == INVALID_SOCKET) return false;
+		return send(m_client, packet.packData(), packet.size(), 0) > 0;
 	}
 
 private:

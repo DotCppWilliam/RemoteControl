@@ -5,6 +5,7 @@
 #include "framework.h"
 #include "RemoteCtrl.h"
 #include "ServerSocket.h"
+#include <direct.h>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -23,6 +24,26 @@
 CWinApp theApp;
 
 using namespace std;
+
+
+/* 获取所有的磁盘符 */
+int MakeDriverInfo()
+{
+    std::string result;
+    for (int i = 1; i <= 26; i++)   // 1==> A, 2==>B, ..., 26==Z
+    {
+        if (_chdrive(i) == 0)
+        {
+			if (result.size() > 0)
+				result += ",";
+            result += 'a' + i - 1;
+        }
+    }
+    CPacket pack(1, (BYTE*)result.c_str(), result.size());
+  
+    //CServerSocket::getInstance()->SendData(CPacket(1, (BYTE*)&result, result.size()));
+	return 0;
+}
 
 int main()
 {
@@ -65,7 +86,7 @@ int main()
      //           // TODO:
      //       }
 
-
+            MakeDriverInfo();
 
         }
     }
