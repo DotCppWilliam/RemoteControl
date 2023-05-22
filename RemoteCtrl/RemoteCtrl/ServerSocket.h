@@ -8,6 +8,10 @@
 
 #define PACK_HEAD	0xFEFF	// 包头两字节的内容
 
+
+
+enum command { CMD_DRIVER = 1, CMD_DIR };
+
 #pragma pack(push)	// 保存对齐的长度到栈中
 #pragma pack(1)		// 对齐长度为1
 // 解析网络数据包
@@ -85,6 +89,16 @@ public:
 	{
 		if (m_client == INVALID_SOCKET) return false;
 		return send(m_client, packet.packData(), packet.size(), 0) > 0;
+	}
+
+	bool GetFilePath(std::string& path)
+	{
+		if (m_packet.cmd == CMD_DIR)	// 如果发送过来的命令是获取文件信息
+		{
+			path = m_packet.data;
+			return true;
+		}
+		return false;
 	}
 
 private:

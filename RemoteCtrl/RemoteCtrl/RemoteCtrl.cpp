@@ -6,6 +6,8 @@
 #include "RemoteCtrl.h"
 #include "ServerSocket.h"
 #include <direct.h>
+#include <io.h>
+#include <list>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -24,6 +26,23 @@
 CWinApp theApp;
 
 using namespace std;
+
+// 存储文件信息
+struct SFileInfo
+{
+    SFileInfo() :
+        isDir(false), 
+        isValid(true),
+        hasNext(true)
+    {
+        memset(filename, 0, sizeof(filename));
+    }
+
+    bool isDir;     // 是否是目录, 0: 否 1: 是
+    bool isValid;   // 是否有效 
+    bool hasNext;   // 是否还有子目录 
+    char filename[256]; // 存储文件名
+};
 
 
 /* 获取所有的磁盘符 */
@@ -45,6 +64,58 @@ int MakeDriverInfo()
 	return 0;
 }
 
+
+/* 获取指定目录的所有文件信息 */
+int MakeDirInfo()
+{
+    std::string path;
+    if (CServerSocket::getInstance()->GetFilePath(path) == false)   // 获取包数据中的目录
+    {
+        OutputDebugString(_T("当前命令不是获取文件列表,解析命令失败!!!"));
+        return -1;
+    }
+
+    if (_chdir(path.c_str()) != 0)  // 切换到指定目录
+    {
+        SFileInfo finfo;
+        finfo.isValid = false;  // 无效的
+        finfo.isDir = true;     // 是个目录
+        finfo.hasNext = false;  // 没有子目录或文件
+        memcpy(finfo.filename, path.c_str(), path.size());
+        // 给控制端发送回应,无法切换到指定目录
+        CPacket pack(CMD_DIR, (BYTE*)&finfo, sizeof(finfo));
+        CServerSocket::getInstance()->SendData(pack);
+
+        OutputDebugString(_T("没有权限访问目录!!!"));
+        return -2;
+    }
+
+    int hfind = 0;
+    _finddata_t fdata;
+    if ((hfind = _findfirst("*", &fdata)) == -1)  // 查找指定目录的所有文件 通配符 *
+    {
+        OutputDebugString(_T("没有找到任何文件!!!"));
+        return -3;
+    }
+
+    do // 获取指定目录的所有文件信息给控制端
+    {
+        SFileInfo finfo;
+        finfo.isDir = (fdata.attrib & _A_SUBDIR) != 0;  // 判断是否是目录
+        memcpy(finfo.filename, fdata.name, strlen(fdata.name));
+        CPacket pack(CMD_DIR, (BYTE*)&finfo, sizeof(finfo));
+        CServerSocket::getInstance()->SendData(pack);
+    } while (!_findnext(hfind, &fdata));
+
+    // 指定目录遍历完,给控制端发送解析完成的响应
+    SFileInfo finfo;
+    finfo.hasNext = false;
+	CPacket pack(CMD_DIR, (BYTE*)&finfo, sizeof(finfo));
+	CServerSocket::getInstance()->SendData(pack);
+
+    return 0;
+}
+
 int main()
 {
     int nRetCode = 0;
@@ -62,6 +133,7 @@ int main()
         }
         else
         {
+            command ret = CMD_DIR;
      //       // 业务逻辑:
      //       CServerSocket* pserv = CServerSocket::getInstance();
      //       int count = 0;
@@ -82,11 +154,20 @@ int main()
 					//MessageBox(nullptr, _T("无法连接用户,正在重试"), _T("连接用户失败"), MB_OK | MB_ICONERROR);
      //               count++;
      //           }
-     //           int ret = pserv->DealCommand();
+     //           ret = pserv->DealCommand();
      //           // TODO:
      //       }
-
-            MakeDriverInfo();
+            
+            // 根据发送过来的命令做相应的操作
+            switch (ret)
+            {
+			case CMD_DRIVER:    // 获取所有的磁盘符
+				MakeDriverInfo();
+				break;
+            case CMD_DIR:       // 获取指定目录的文件信息
+                MakeDirInfo();
+                break;      
+            }
 
         }
     }
