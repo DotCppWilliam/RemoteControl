@@ -9,8 +9,11 @@
 #define PACK_HEAD	0xFEFF	// 包头两字节的内容
 
 
-
-enum command { CMD_DRIVER = 1, CMD_DIR };
+// CMD_DRIVER: 获取所有的磁盘符
+// CMD_DIR: 获取指定目录的信息
+// CMD_RUN: 运行某个文件
+// CMD_DLFILE: 下载某个文件
+enum command { CMD_DRIVER = 1, CMD_DIR, CMD_RUN, CMD_DLFILE };
 
 #pragma pack(push)	// 保存对齐的长度到栈中
 #pragma pack(1)		// 对齐长度为1
@@ -26,10 +29,14 @@ public:
 		head = PACK_HEAD;
 		length = size + 4;
 		cmd = _cmd;
-		data.resize(size);
-		memcpy((BYTE*)data.c_str(), pdata, size);
+		if (size > 0)
+		{
+			data.resize(size);
+			memcpy((BYTE*)data.c_str(), pdata, size);
+		}
+		else
+			data.clear();
 
-		sum = 0;
 		for (int i = 0; i < size; i++)
 			sum += (BYTE)pdata[i] & 0xFF;
 	}
@@ -93,7 +100,7 @@ public:
 
 	bool GetFilePath(std::string& path)
 	{
-		if (m_packet.cmd == CMD_DIR)	// 如果发送过来的命令是获取文件信息
+		if (m_packet.cmd >= CMD_DIR && m_packet.cmd <= CMD_DLFILE)
 		{
 			path = m_packet.data;
 			return true;
