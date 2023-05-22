@@ -2,10 +2,10 @@
 
 #include "pch.h"
 #include "framework.h"
+#include "Mouse.h"
 
 #define SERV_PORT	9527	// 端口号
 #define BUFFER_SIZE	4096	// 缓冲区大小
-
 #define PACK_HEAD	0xFEFF	// 包头两字节的内容
 
 
@@ -13,7 +13,7 @@
 // CMD_DIR: 获取指定目录的信息
 // CMD_RUN: 运行某个文件
 // CMD_DLFILE: 下载某个文件
-enum command { CMD_DRIVER = 1, CMD_DIR, CMD_RUN, CMD_DLFILE };
+enum command { CMD_DRIVER = 1, CMD_DIR, CMD_RUN, CMD_DLFILE, CMD_MOUSE };
 
 #pragma pack(push)	// 保存对齐的长度到栈中
 #pragma pack(1)		// 对齐长度为1
@@ -98,11 +98,23 @@ public:
 		return send(m_client, packet.packData(), packet.size(), 0) > 0;
 	}
 
+	/* 获取文件信息 */
 	bool GetFilePath(std::string& path)
 	{
 		if (m_packet.cmd >= CMD_DIR && m_packet.cmd <= CMD_DLFILE)
 		{
 			path = m_packet.data;
+			return true;
+		}
+		return false;
+	}
+
+	/* 获取鼠标信息 */
+	bool GetMouseEvent(MouseEvent& mouse)
+	{
+		if (m_packet.cmd == CMD_MOUSE)
+		{
+			memcpy(&mouse, m_packet.data.c_str(), sizeof(mouse));
 			return true;
 		}
 		return false;

@@ -173,6 +173,131 @@ int DownloadFile()
     return 0;
 }
 
+
+/* 获取鼠标 */
+int GetMouseEvent()
+{
+    MouseEvent mouse;
+    if (CServerSocket::getInstance()->GetMouseEvent(mouse))
+    {
+        DWORD flags = 0; 
+        // 处理是什么按键
+        switch (mouse.button)
+        {
+        case LEFT_BUTTON:   flags = 1;  break;  // 左键
+        case RIGHT_BUTTON:  flags = 2;  break;  // 右键
+        case MIDDLE_BUTTON: flags = 4;  break;  // 中键
+        case MOUSE:         flags = 8;  break;  // 没有按键,鼠标移动
+        }
+
+        if (flags != 8)
+            SetCursorPos(mouse.point.x, mouse.point.y); // 设置鼠标的位置
+
+        // 处理动作
+        switch (mouse.action)
+        {
+        case 0: flags |= 0x10; break;   // 单击
+        case 1: flags |= 0x20; break;   // 双击
+        case 2: flags |= 0x40; break;   // 按下
+        case 3: flags |= 0x80; break;   // 释放
+        deafult: break;
+        }
+
+        // 处理不同的组合情况
+        switch (flags)
+        {
+        //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+        /* 处理左键 */
+        case 0x11: // 左键单击
+        {
+			// GetMessageExtraInfo: 获取鼠标的附加信息
+			mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, GetMessageExtraInfo());
+			mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, GetMessageExtraInfo());
+        }
+        case 0x21: // 左键双击
+        {
+			mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, GetMessageExtraInfo());
+			mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, GetMessageExtraInfo());
+            break;
+        }
+        case 0x41: // 左键按下
+        {
+            mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, GetMessageExtraInfo());
+            break;
+        }
+        case 0x81: // 左键释放
+		{
+            mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, GetMessageExtraInfo());
+			break;
+		}
+        //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+        /* 处理右键 */
+		case 0x12: // 右键单击
+		{
+			mouse_event(MOUSEEVENTF_RIGHTDOWN, 0, 0, 0, GetMessageExtraInfo());
+			mouse_event(MOUSEEVENTF_RIGHTUP, 0, 0, 0, GetMessageExtraInfo());
+		}
+		case 0x22: // 右键双击
+		{
+			mouse_event(MOUSEEVENTF_RIGHTDOWN, 0, 0, 0, GetMessageExtraInfo());
+			mouse_event(MOUSEEVENTF_RIGHTUP, 0, 0, 0, GetMessageExtraInfo());
+			break;
+		}
+
+		case 0x42: // 右键按下
+		{
+            mouse_event(MOUSEEVENTF_RIGHTDOWN, 0, 0, 0, GetMessageExtraInfo());
+			break;
+		}
+		case 0x82: // 右键释放
+		{
+            mouse_event(MOUSEEVENTF_RIGHTUP, 0, 0, 0, GetMessageExtraInfo());
+			break;
+		}
+
+        //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+        /* 处理中键 */
+		case 0x14: // 中键单击
+		{
+			mouse_event(MOUSEEVENTF_MIDDLEDOWN, 0, 0, 0, GetMessageExtraInfo());
+			mouse_event(MOUSEEVENTF_MIDDLEUP, 0, 0, 0, GetMessageExtraInfo());
+		}
+		case 0x24: // 中键双击
+		{
+            mouse_event(MOUSEEVENTF_MIDDLEDOWN, 0, 0, 0, GetMessageExtraInfo());
+            mouse_event(MOUSEEVENTF_MIDDLEUP, 0, 0, 0, GetMessageExtraInfo());
+			break;
+		}
+		case 0x44: // 中键按下
+		{
+            mouse_event(MOUSEEVENTF_MIDDLEDOWN, 0, 0, 0, GetMessageExtraInfo());
+			break;
+		}
+		case 0x84: // 中键释放
+		{
+            mouse_event(MOUSEEVENTF_MIDDLEUP, 0, 0, 0, GetMessageExtraInfo());
+			break;
+		}
+        //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+        case 0x8:  // 鼠标移动
+		{
+            mouse_event(MOUSEEVENTF_MOVE, mouse.point.x, mouse.point.y, 0, GetMessageExtraInfo());
+			break;
+		}
+
+        deafult: break;
+        }
+
+        CPacket pack(CMD_MOUSE, nullptr, 0);
+        CServerSocket::getInstance()->SendData(pack);
+    }
+    else
+    {
+        OutputDebugString(_T("获取鼠标参数失败!!!"));
+        return -1;
+    }
+}
+
 int main()
 {
     int nRetCode = 0;
@@ -227,9 +352,12 @@ int main()
             case CMD_RUN:       // 运行某个文件
                 RunFile();
                 break;
-            case CMD_DLFILE:
+            case CMD_DLFILE:    // 下载文件
                 DownloadFile();
                 break;
+			case CMD_MOUSE:    // 鼠标
+				GetMouseEvent();
+				break;
             }
 
         }
