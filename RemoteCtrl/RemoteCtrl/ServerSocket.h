@@ -9,11 +9,20 @@
 #define PACK_HEAD	0xFEFF	// 包头两字节的内容
 
 
-// CMD_DRIVER: 获取所有的磁盘符
-// CMD_DIR: 获取指定目录的信息
-// CMD_RUN: 运行某个文件
-// CMD_DLFILE: 下载某个文件
-enum command { CMD_DRIVER = 1, CMD_DIR, CMD_RUN, CMD_DLFILE, CMD_MOUSE };
+
+
+
+
+enum command { 
+	CMD_DRIVER = 1,		// CMD_DRIVER: 获取所有的磁盘符
+	CMD_DIR,			// CMD_DIR: 获取指定目录的信息
+	CMD_RUN,			// CMD_RUN: 运行某个文件
+	CMD_DLFILE,			// CMD_DLFILE: 下载某个文件
+	CMD_SCREEN,			// 屏幕
+	CMD_MOUSE,			// 鼠标操作
+	CMD_LOCK_MACHINE,	// 锁机
+	CMD_UNLOCK_MACHINE	// 解锁
+};
 
 #pragma pack(push)	// 保存对齐的长度到栈中
 #pragma pack(1)		// 对齐长度为1
@@ -110,7 +119,7 @@ public:
 	}
 
 	/* 获取鼠标信息 */
-	bool GetMouseEvent(MouseEvent& mouse)
+	bool GetMouseEvent(Mouse& mouse)
 	{
 		if (m_packet.cmd == CMD_MOUSE)
 		{

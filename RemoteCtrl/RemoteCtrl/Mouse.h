@@ -4,9 +4,9 @@
 
 enum mouse_btn { LEFT_BUTTON = 1, RIGHT_BUTTON, MIDDLE_BUTTON, MOUSE };
 
-struct MouseEvent
+struct Mouse
 {
-	MouseEvent() : 
+	Mouse() :
 		action(0), button(-1)  
 	{
 		point.x = 0;

@@ -8,8 +8,7 @@
 #include <direct.h>
 #include <io.h>
 #include <list>
-#include <fstream>
-#include <string>
+#include <atlimage.h>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -175,9 +174,9 @@ int DownloadFile()
 
 
 /* 获取鼠标 */
-int GetMouseEvent()
+int MouseEvent()
 {
-    MouseEvent mouse;
+    Mouse mouse;
     if (CServerSocket::getInstance()->GetMouseEvent(mouse))
     {
         DWORD flags = 0; 
@@ -285,7 +284,7 @@ int GetMouseEvent()
 			break;
 		}
 
-        deafult: break;
+        default: break;
         }
 
         CPacket pack(CMD_MOUSE, nullptr, 0);
@@ -296,6 +295,72 @@ int GetMouseEvent()
         OutputDebugString(_T("获取鼠标参数失败!!!"));
         return -1;
     }
+}
+
+
+/* 发送屏幕(也就是屏幕的截图) */
+int SendScreen()
+{
+    CImage screen;
+    HDC hscreen = ::GetDC(nullptr);
+    // 获取屏幕的颜色位深度,也就是每个像素所占用的位数
+    int bitPerPixel = GetDeviceCaps(hscreen, BITSPIXEL);  
+    int width = GetDeviceCaps(hscreen, HORZRES);    // 屏幕分辨率宽
+    int height = GetDeviceCaps(hscreen, VERTRES);   // 屏幕分辨率高
+    screen.Create(width, height, bitPerPixel);  // 创建一个屏幕缓冲区对象
+
+    // 获取屏幕的图像拷贝到屏幕缓冲区中
+    BitBlt(screen.GetDC(), 0, 0, width, height, hscreen, 0, 0, SRCCOPY);
+    ReleaseDC(nullptr, hscreen);    // 释放屏幕设备上下文句柄以便其他程序使用
+
+    // 测试执行的效率
+    //ULONGLONG tick = GetTickCount64();
+    //screen.Save(_T("test.png"), Gdiplus::ImageFormatPNG);// 保存到文件中
+    //TRACE("png %d\n", GetTickCount64() - tick);
+
+    // 分配一个可移动的内存块,返回一个句柄
+    HGLOBAL mem = GlobalAlloc(GMEM_MOVEABLE, 0);
+    if (mem == nullptr) return -1;
+
+    // 将mem转换为IStream接口对象,即内存块与IStream关联,这样就可以通过流操作内存
+    LPSTREAM pstream;
+    HRESULT ret = CreateStreamOnHGlobal(mem, TRUE, &pstream);
+    if (ret == S_OK)
+    {
+        screen.Save(pstream, Gdiplus::ImageFormatPNG);  // 将图像数据写入到流中
+        LARGE_INTEGER bg = { 0 };
+        pstream->Seek(bg, STREAM_SEEK_SET, nullptr);    // 定位到流的头部
+        PBYTE data = (PBYTE)GlobalLock(mem);    // 将全局内存块锁定,并返回内存块首地址
+        SIZE_T size = GlobalSize(mem);  // 获得这个内存块的大小
+
+        // 发送给控制端
+        CPacket pack(CMD_SCREEN, data, size);
+        CServerSocket::getInstance()->SendData(pack);
+
+        GlobalUnlock(mem);  // 解锁
+    }
+
+    pstream->Release();
+    GlobalFree(mem);
+    screen.ReleaseDC();
+
+    return 0;
+}
+
+/* 锁机 */
+int LockMachine()
+{
+
+
+    return 0;
+}
+
+
+/* 解锁 */
+int UnLockMachine()
+{
+
+    return 0;
 }
 
 int main()
@@ -315,7 +380,7 @@ int main()
         }
         else
         {
-            command ret = CMD_DIR;
+            command ret = CMD_SCREEN;
      //       // 业务逻辑:
      //       CServerSocket* pserv = CServerSocket::getInstance();
      //       int count = 0;
@@ -355,9 +420,20 @@ int main()
             case CMD_DLFILE:    // 下载文件
                 DownloadFile();
                 break;
-			case CMD_MOUSE:    // 鼠标
-				GetMouseEvent();
+			case CMD_MOUSE:     // 鼠标
+                MouseEvent();
 				break;
+            case CMD_SCREEN:    // 发送屏幕内容-> 发送屏幕的截图
+                SendScreen();
+                break;
+            case CMD_LOCK_MACHINE:
+                LockMachine();  // 锁机
+                break;
+            case CMD_UNLOCK_MACHINE:
+                UnLockMachine();// 解锁
+                break;
+
+
             }
 
         }
