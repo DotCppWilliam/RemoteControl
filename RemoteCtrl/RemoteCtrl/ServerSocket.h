@@ -36,7 +36,7 @@ public:
 		: head(0), length(0), cmd(0), sum(0)
 	{
 		head = PACK_HEAD;
-		length = size + 4;
+		length = (DWORD)(size + 4);
 		cmd = _cmd;
 		if (size > 0)
 		{
@@ -98,7 +98,7 @@ public:
 	bool SendData(const char* data, size_t size)
 	{
 		if (m_client == INVALID_SOCKET) return false;
-		return send(m_client, data, size, 0) > 0;
+		return send(m_client, data, (int)size, 0) > 0;
 	}
 
 	bool SendData(CPacket& packet)

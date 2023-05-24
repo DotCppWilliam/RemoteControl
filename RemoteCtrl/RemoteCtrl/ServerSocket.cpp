@@ -5,6 +5,7 @@ CServerSocket* CServerSocket::m_instance = nullptr;
 CServerSocket::CHelper CServerSocket::m_helper;
 
 CPacket::CPacket(const BYTE* pdata, size_t& size, CPacket& packet)
+	: head(0), length(0), cmd(0), sum(0)
 {
 	size_t i = 0;
 	// 找到包头位置
@@ -38,7 +39,7 @@ CPacket::CPacket(const BYTE* pdata, size_t& size, CPacket& packet)
 
 
 	// 3. 解析控制命令
-	packet.cmd = *(DWORD*)(pdata + i);
+	packet.cmd = *(WORD*)(pdata + i);
 	i += 2;	// 指向包的数据的地址
 
 	// 4. 解析数据
@@ -55,7 +56,7 @@ CPacket::CPacket(const BYTE* pdata, size_t& size, CPacket& packet)
 
 	// 计算校验和,然后和包的校验和匹配
 	WORD data_sum = 0;
-	int dsize = data.size();
+	size_t dsize = data.size();
 	for (i = 0; i < dsize; i++)
 		data_sum += BYTE(data[i]) & 0xFF;
 

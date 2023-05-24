@@ -9,6 +9,7 @@
 #include <io.h>
 #include <list>
 #include <atlimage.h>
+#include "LockDialog.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -25,8 +26,12 @@
 //#pragma comment(linker, "/SUBSYSTEM:WINDOWS /ENTRY:mainCRTStartup")
 
 // 唯一的应用程序对象
-
 CWinApp theApp;
+
+CLockDialog lockDlg;    // 锁住机器的屏幕对象
+
+unsigned threadId = 0;  // 线程Id
+
 
 using namespace std;
 
@@ -93,7 +98,7 @@ int MakeDirInfo()
         return -2;
     }
 
-    int hfind = 0;
+    intptr_t hfind = 0;
     _finddata_t fdata;
     if ((hfind = _findfirst("*", &fdata)) == -1)  // 查找指定目录的所有文件 通配符 *
     {
@@ -199,7 +204,6 @@ int MouseEvent()
         case 1: flags |= 0x20; break;   // 双击
         case 2: flags |= 0x40; break;   // 按下
         case 3: flags |= 0x80; break;   // 释放
-        deafult: break;
         }
 
         // 处理不同的组合情况
@@ -295,6 +299,8 @@ int MouseEvent()
         OutputDebugString(_T("获取鼠标参数失败!!!"));
         return -1;
     }
+
+    return 0;
 }
 
 
@@ -347,18 +353,73 @@ int SendScreen()
     return 0;
 }
 
-/* 锁机 */
-int LockMachine()
-{
 
+/* 子线程, 执行锁机操作 */
+unsigned __stdcall threadLockDlg(void* arg)
+{
+    TRACE("子线程: %d\r\n", GetCurrentThreadId());
+	lockDlg.Create(ID_DIALOG_INFO, nullptr);
+	lockDlg.ShowWindow(SW_SHOW);        // 非模态
+	lockDlg.SetWindowPos(&lockDlg.wndTopMost, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE);
+
+	HDC hscreen = ::GetDC(nullptr);
+	// 设置为全屏
+	CRect rect(0, 0, GetDeviceCaps(hscreen, HORZRES), GetDeviceCaps(hscreen, VERTRES));
+	lockDlg.MoveWindow(rect);
+	// 限制鼠标功能
+	ShowCursor(false);
+
+	rect.right = 1;
+	rect.bottom = 1;
+	ClipCursor(rect);   // 限制鼠标活动范围
+	// 隐藏任务栏
+	ShowWindow(FindWindow(_T("Shell_TrayWnd"), nullptr), SW_HIDE);
+
+	MSG msg;
+	while (GetMessage(&msg, nullptr, 0, 0))     // 从消息队列获取消息
+	{
+		TranslateMessage(&msg); // 将键盘消息转换为字符消息.
+		DispatchMessage(&msg);  // 将收到的消息分派给窗口过程进行处理
+		if (msg.message == WM_KEYDOWN)  // 以下处理键盘按下的消息
+		{
+			TRACE("msg: %08X wparm: %08x lparm: %08x\r\n", msg.message, msg.wParam, msg.lParam);
+			if (msg.wParam == 0x1b) // 按esc键退出
+				break;
+		}
+	}
+
+    ShowWindow(FindWindow(_T("Shell_TrayWnd"), nullptr), SW_SHOW);
+	lockDlg.DestroyWindow();
+	ShowCursor(true);
+    _endthreadex(0);
 
     return 0;
 }
+
+/* 锁机 */
+int LockMachine()
+{
+    if (lockDlg.m_hWnd == nullptr || lockDlg.m_hWnd == INVALID_HANDLE_VALUE)
+    {
+        // 创建一个线程
+        // 1. 线程安全属性 2. 堆栈大小 3. 线程起点函数 4. 参数 5. 标志 6. 返回线程id
+        _beginthreadex(nullptr, 0, threadLockDlg, nullptr, 0, &threadId);
+        TRACE("threadid: %d\r\n", threadId);
+    }
+    
+    CPacket pack(CMD_LOCK_MACHINE, nullptr, 0);
+    CServerSocket::getInstance()->SendData(pack);
+    
+    return 0;
+} 
 
 
 /* 解锁 */
 int UnLockMachine()
 {
+    PostThreadMessage(threadId, WM_KEYDOWN, 0x1b, 0);
+    CPacket pack(CMD_UNLOCK_MACHINE, nullptr, 0);
+    CServerSocket::getInstance()->SendData(pack);
 
     return 0;
 }
@@ -380,7 +441,7 @@ int main()
         }
         else
         {
-            command ret = CMD_SCREEN;
+            command ret = CMD_LOCK_MACHINE;
      //       // 业务逻辑:
      //       CServerSocket* pserv = CServerSocket::getInstance();
      //       int count = 0;
@@ -428,14 +489,21 @@ int main()
                 break;
             case CMD_LOCK_MACHINE:
                 LockMachine();  // 锁机
+
+                Sleep(5000);
                 break;
             case CMD_UNLOCK_MACHINE:
                 UnLockMachine();// 解锁
                 break;
 
-
             }
 
+            UnLockMachine();
+
+            while (lockDlg.m_hWnd != nullptr)
+                Sleep(20);
+
+            
         }
     }
     else
