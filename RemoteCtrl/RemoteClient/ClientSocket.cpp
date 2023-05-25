@@ -98,9 +98,9 @@ std::string GetErrInfo(int errNo)
 }
 
 /* ≥ı ºªØsocket */
-bool CClientSocket::InitSocket(const std::string& addr)
+bool CClientSocket::InitSocket(DWORD addr, USHORT port)
 {
-	if (m_socket == INVALID_SOCKET)
+	if (m_socket != INVALID_SOCKET)
 		CloseSocket();
 
 	m_socket = socket(AF_INET, SOCK_STREAM, 0);
@@ -112,8 +112,8 @@ bool CClientSocket::InitSocket(const std::string& addr)
 	sockaddr_in serv_adr;
 	memset(&serv_adr, 0, sizeof(serv_adr));
 	serv_adr.sin_family = AF_INET;	// IPV_4
-	serv_adr.sin_addr.s_addr = inet_addr(addr.c_str());
-	serv_adr.sin_port = htons(SERV_PORT);
+	serv_adr.sin_addr.s_addr = htonl(addr);
+	serv_adr.sin_port = htons(port);
 
 	if (serv_adr.sin_addr.s_addr == INADDR_NONE)
 	{

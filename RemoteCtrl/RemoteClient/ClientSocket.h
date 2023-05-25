@@ -4,7 +4,6 @@
 #include <string>
 #include <vector>
 
-#define SERV_PORT	9527	// 端口号
 #define BUFFER_SIZE	4096	// 缓冲区大小
 #define PACK_HEAD	0xFEFF	// 包头两字节的内容
 
@@ -88,7 +87,7 @@ public:
 
 
 	/* 初始化socket */
-	bool InitSocket(const std::string& addr);
+	bool InitSocket(DWORD addr, USHORT port);
 
 	/* 关闭套接字 */
 	void CloseSocket()

@@ -8,6 +8,7 @@
 #include "RemoteClientDlg.h"
 #include "afxdialogex.h"
 #include "ClientSocket.h"
+#include <atlconv.h>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -53,6 +54,8 @@ END_MESSAGE_MAP()
 
 CRemoteClientDlg::CRemoteClientDlg(CWnd* pParent /*=nullptr*/)
 	: CDialogEx(IDD_REMOTECLIENT_DIALOG, pParent)
+	, m_serv_adr(0)
+	, m_port(_T(""))
 {
 	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
 }
@@ -60,6 +63,8 @@ CRemoteClientDlg::CRemoteClientDlg(CWnd* pParent /*=nullptr*/)
 void CRemoteClientDlg::DoDataExchange(CDataExchange* pDX)
 {
 	CDialogEx::DoDataExchange(pDX);
+	DDX_IPAddress(pDX, ID_IPADDR_SERV, m_serv_adr);
+	DDX_Text(pDX, ID_PORT, m_port);
 }
 
 BEGIN_MESSAGE_MAP(CRemoteClientDlg, CDialogEx)
@@ -102,6 +107,10 @@ BOOL CRemoteClientDlg::OnInitDialog()
 	SetIcon(m_hIcon, FALSE);		// 设置小图标
 
 	// TODO: 在此添加额外的初始化代码
+	UpdateData();
+	m_serv_adr = 0x7F000001;
+	m_port = _T("9527");
+	UpdateData(FALSE);
 
 	return TRUE;  // 除非将焦点设置到控件，否则返回 TRUE
 }
@@ -155,13 +164,14 @@ HCURSOR CRemoteClientDlg::OnQueryDragIcon()
 	return static_cast<HCURSOR>(m_hIcon);
 }
 
-
+#include <string>
 
 void CRemoteClientDlg::OnBnClickedBtnTest()
 {
+	UpdateData();
 	bool ret;
 	CClientSocket* pClient = CClientSocket::getInstance();
-	ret = pClient->InitSocket("127.0.0.1");
+	ret = pClient->InitSocket(m_serv_adr, atoi(CW2A( m_port.GetBuffer())));
 	if (ret)
 		TRACE("客户端连接成功\r\n");
 
