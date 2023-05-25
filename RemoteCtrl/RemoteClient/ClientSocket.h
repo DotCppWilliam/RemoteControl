@@ -1,15 +1,15 @@
 #pragma once
 
-#include "pch.h"
-#include "framework.h"
 #include "Mouse.h"
+#include <string>
+#include <vector>
 
 #define SERV_PORT	9527	// 端口号
 #define BUFFER_SIZE	4096	// 缓冲区大小
 #define PACK_HEAD	0xFEFF	// 包头两字节的内容
 
 
-enum command { 
+enum command {
 	CMD_ERR = -1,
 	CMD_DRIVER = 1,		// CMD_DRIVER: 获取所有的磁盘符
 	CMD_DIR,			// CMD_DIR: 获取指定目录的信息
@@ -45,6 +45,7 @@ public:
 
 		for (int i = 0; i < size; i++)
 			sum += (BYTE)pdata[i] & 0xFF;
+		TRACE("client packet: head=%d, length=%d, cmd=%d, sum=%d\r\n", head, length, cmd, sum);
 	}
 	~CPacket() {}
 
@@ -72,27 +73,32 @@ public:
 };
 #pragma pack(pop)	// 恢复为原来的对齐长度
 
-class CServerSocket
+
+
+
+class CClientSocket
 {
 public:
-	static CServerSocket* getInstance()
+	static CClientSocket* getInstance()
 	{
 		if (m_instance == nullptr)
-			m_instance = new CServerSocket;
+			m_instance = new CClientSocket;
 		return m_instance;
 	}
+
+
+	/* 初始化socket */
+	bool InitSocket(const std::string& addr);
 
 	/* 关闭套接字 */
 	void CloseSocket()
 	{
-		closesocket(m_client);
+		if (m_socket != INVALID_SOCKET)
+		{
+			closesocket(m_socket);
+			m_socket = INVALID_SOCKET;
+		}
 	}
-
-	/* 初始化socket */
-	bool InitSocket();
-
-	/* 接收客户端连接 */
-	bool AcceptClient();
 
 	/* 处理客户端发送的命令 */
 	int DealCommand();
@@ -100,14 +106,18 @@ public:
 	/* 发送数据 */
 	bool SendData(const char* data, size_t size)
 	{
-		if (m_client == INVALID_SOCKET) return false;
-		return send(m_client, data, (int)size, 0) > 0;
+		if (m_socket == INVALID_SOCKET) return false;
+		return send(m_socket, data, (int)size, 0) > 0;
 	}
 
 	bool SendData(CPacket& packet)
 	{
-		if (m_client == INVALID_SOCKET) return false;
-		return send(m_client, packet.packData(), packet.size(), 0) > 0;
+		if (m_socket == INVALID_SOCKET) return false;
+
+		TRACE("客户端发送数据大小: %d\r\n", packet.size());
+		TRACE("客户端套接字: %d\r\n", m_socket);
+		const char* ptr = packet.packData();
+		return send(m_socket, packet.packData(), packet.size(), 0) > 0;
 	}
 
 	/* 获取文件信息 */
@@ -136,9 +146,10 @@ public:
 	{
 		return m_packet;
 	}
+
 private:
-// 构造、析构
-	CServerSocket() 
+	// 构造、析构
+	CClientSocket()
 	{
 		if (InitSockEnv() == FALSE)
 		{
@@ -146,20 +157,22 @@ private:
 				_T("初始化错误"), MB_OK | MB_ICONERROR);
 			exit(EXIT_FAILURE);
 		}
-		m_socket = socket(PF_INET, SOCK_STREAM, 0);
+		m_buffer.resize(BUFFER_SIZE);
+		
+		m_socket = INVALID_SOCKET;	// 初始化
 	}
-	~CServerSocket() 
+	~CClientSocket()
 	{
 		closesocket(m_socket);
 		WSACleanup();
 	}
 
-// 拷贝构造、拷贝赋值运算符
-	CServerSocket(const CServerSocket&) {}
-	CServerSocket& operator=(const CServerSocket&) {}
+	// 拷贝构造、拷贝赋值运算符
+	CClientSocket(const CClientSocket&) {}
+	CClientSocket& operator=(const CClientSocket&) {}
 
-// 成员函数
-	/* 初始化Winsock库 */
+	// 成员函数
+		/* 初始化Winsock库 */
 	BOOL InitSockEnv()
 	{
 		// TODO: 在此处为应用程序的行为编写代码。
@@ -174,34 +187,30 @@ private:
 	{
 		if (m_instance != nullptr)
 		{
-			CServerSocket* tmp = m_instance;
+			CClientSocket* tmp = m_instance;
 			m_instance = nullptr;
 			delete tmp;
 		}
 	}
-// 私有类
+	// 私有类
 	class CHelper
 	{
 	public:
 		CHelper()
 		{
-			CServerSocket::getInstance();
+			CClientSocket::getInstance();
 		}
 		~CHelper()
 		{
-			CServerSocket::releaseInstance();
+			CClientSocket::releaseInstance();
 		}
 	};
 private:
-// 成员变量
+	// 成员变量
 	SOCKET m_socket = INVALID_SOCKET;	// 监听套接字
-	SOCKET m_client = INVALID_SOCKET;	// 客户端套接字
 	CPacket m_packet;
+	std::vector<char> m_buffer;
 
-	static CServerSocket* m_instance;
+	static CClientSocket* m_instance;
 	static CHelper m_helper;
 };
-
-
-
-//extern CServerSocket server;

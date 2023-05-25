@@ -333,7 +333,7 @@ int SendScreen()
     HRESULT ret = CreateStreamOnHGlobal(mem, TRUE, &pstream);
     if (ret == S_OK)
     {
-        screen.Save(pstream, Gdiplus::ImageFormatPNG);  // 将图像数据写入到流中
+        screen.Save(pstream, Gdiplus::ImageFormatJPEG);  // 将图像数据写入到流中
         LARGE_INTEGER bg = { 0 };
         pstream->Seek(bg, STREAM_SEEK_SET, nullptr);    // 定位到流的头部
         PBYTE data = (PBYTE)GlobalLock(mem);    // 将全局内存块锁定,并返回内存块首地址
@@ -424,6 +424,47 @@ int UnLockMachine()
     return 0;
 }
 
+// 根据发送过来的命令做相应的操作
+int ExecuteCmd(int cmd)
+{
+    int ret = 0;
+	switch (cmd)
+	{
+	case CMD_DRIVER:    // 获取所有的磁盘符
+        ret = MakeDriverInfo();
+		break;
+	case CMD_DIR:       // 获取指定目录的文件信息
+        ret = MakeDirInfo();
+		break;
+	case CMD_RUN:       // 运行某个文件
+        ret = RunFile();
+		break;
+	case CMD_DLFILE:    // 下载文件
+        ret = DownloadFile();
+		break;
+	case CMD_MOUSE:     // 鼠标
+        ret = MouseEvent();
+		break;
+	case CMD_SCREEN:    // 发送屏幕内容-> 发送屏幕的截图
+        ret = SendScreen();
+		break;
+	case CMD_LOCK_MACHINE:
+        ret = LockMachine();  // 锁机
+		break;
+	case CMD_UNLOCK_MACHINE:
+        ret = UnLockMachine();// 解锁
+		break;
+    case 1024:
+        TRACE("被控端收到客户端发来的命令: %d\r\n", cmd);
+
+        CPacket pac(2000, nullptr, 0);
+        CServerSocket::getInstance()->SendData(pac);
+
+        break;
+	}
+    return ret;
+}
+
 int main()
 {
     int nRetCode = 0;
@@ -432,6 +473,7 @@ int main()
 
     if (hModule != nullptr)
     {
+        
         // 初始化 MFC 并在失败时显示错误
         if (!AfxWinInit(hModule, nullptr, ::GetCommandLine(), 0))
         {
@@ -441,68 +483,35 @@ int main()
         }
         else
         {
-            command ret = CMD_LOCK_MACHINE;
-     //       // 业务逻辑:
-     //       CServerSocket* pserv = CServerSocket::getInstance();
-     //       int count = 0;
-     //       if (pserv->InitSocket() == false)
-     //       {
-     //           MessageBox(nullptr, _T("网络初始化异常,请检查网络状态"), _T("网络初始化失败"), MB_OK | MB_ICONERROR);
-     //           exit(EXIT_FAILURE);
-     //       }
-     //       while (CServerSocket::getInstance() != nullptr)
-     //       {
-     //           if (pserv->AcceptClient() == false)
-     //           {
-     //               if (count >= 3)
-     //               {
-     //                   MessageBox(nullptr, _T("多次无法正常连接用户,结束进程"), _T("连接用户失败"), MB_OK | MB_ICONERROR);
-     //                   exit(EXIT_FAILURE);
-     //               }
-					//MessageBox(nullptr, _T("无法连接用户,正在重试"), _T("连接用户失败"), MB_OK | MB_ICONERROR);
-     //               count++;
-     //           }
-     //           ret = pserv->DealCommand();
-     //           // TODO:
-     //       }
-            
-            // 根据发送过来的命令做相应的操作
-            switch (ret)
+            // 业务逻辑:
+            CServerSocket* pserv = CServerSocket::getInstance();
+            int count = 0;
+            if (pserv->InitSocket() == false)
             {
-			case CMD_DRIVER:    // 获取所有的磁盘符
-				MakeDriverInfo();
-				break;
-            case CMD_DIR:       // 获取指定目录的文件信息
-                MakeDirInfo();
-                break;     
-            case CMD_RUN:       // 运行某个文件
-                RunFile();
-                break;
-            case CMD_DLFILE:    // 下载文件
-                DownloadFile();
-                break;
-			case CMD_MOUSE:     // 鼠标
-                MouseEvent();
-				break;
-            case CMD_SCREEN:    // 发送屏幕内容-> 发送屏幕的截图
-                SendScreen();
-                break;
-            case CMD_LOCK_MACHINE:
-                LockMachine();  // 锁机
-
-                Sleep(5000);
-                break;
-            case CMD_UNLOCK_MACHINE:
-                UnLockMachine();// 解锁
-                break;
-
+                MessageBox(nullptr, _T("网络初始化异常,请检查网络状态"), _T("网络初始化失败"), MB_OK | MB_ICONERROR);
+                exit(EXIT_FAILURE);
             }
-
-            UnLockMachine();
-
-            while (lockDlg.m_hWnd != nullptr)
-                Sleep(20);
-
+            while (CServerSocket::getInstance() != nullptr)
+            {
+                if (pserv->AcceptClient() == false)
+                {
+                    if (count >= 3)
+                    {
+                        MessageBox(nullptr, _T("多次无法正常连接用户,结束进程"), _T("连接用户失败"), MB_OK | MB_ICONERROR);
+                        exit(EXIT_FAILURE);
+                    }
+					MessageBox(nullptr, _T("无法连接用户,正在重试"), _T("连接用户失败"), MB_OK | MB_ICONERROR);
+                    count++;
+                }
+                int ret = pserv->DealCommand();
+                if (ret == 0)
+                {
+                    ret = ExecuteCmd(pserv->GetPacket().cmd);
+                    if (ret != 0)
+                        TRACE("执行命令失败: %d ret=%d\r\n", pserv->GetPacket().cmd, ret);
+                    pserv->CloseSocket();   // 短连接
+                }
+            }
             
         }
     }

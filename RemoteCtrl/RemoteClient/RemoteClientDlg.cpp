@@ -7,6 +7,7 @@
 #include "RemoteClient.h"
 #include "RemoteClientDlg.h"
 #include "afxdialogex.h"
+#include "ClientSocket.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -65,6 +66,7 @@ BEGIN_MESSAGE_MAP(CRemoteClientDlg, CDialogEx)
 	ON_WM_SYSCOMMAND()
 	ON_WM_PAINT()
 	ON_WM_QUERYDRAGICON()
+	ON_BN_CLICKED(ID_BTN_TEST, &CRemoteClientDlg::OnBnClickedBtnTest)
 END_MESSAGE_MAP()
 
 
@@ -153,3 +155,25 @@ HCURSOR CRemoteClientDlg::OnQueryDragIcon()
 	return static_cast<HCURSOR>(m_hIcon);
 }
 
+
+
+void CRemoteClientDlg::OnBnClickedBtnTest()
+{
+	bool ret;
+	CClientSocket* pClient = CClientSocket::getInstance();
+	ret = pClient->InitSocket("127.0.0.1");
+	if (ret)
+		TRACE("客户端连接成功\r\n");
+
+	CPacket pack(1024, nullptr, 0);
+	ret = pClient->SendData(pack);
+	if (ret)
+		TRACE("客户端发送数据成功\r\n");
+
+	Sleep(4000);
+
+	pClient->DealCommand();
+	TRACE("客户端收到被控端发送过来的命令: %d\r\n", pClient->GetPacket().cmd);
+
+	pClient->CloseSocket();
+}
