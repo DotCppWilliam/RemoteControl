@@ -20,6 +20,25 @@ enum command {
 	CMD_UNLOCK_MACHINE	// 解锁
 };
 
+
+// 存储文件信息
+struct SFileInfo
+{
+	SFileInfo() :
+		isDir(false),
+		isValid(true),
+		hasNext(true)
+	{
+		memset(filename, 0, sizeof(filename));
+	}
+
+	bool isDir;     // 是否是目录, 0: 否 1: 是
+	bool isValid;   // 是否有效 
+	bool hasNext;   // 是否还有子目录 
+	char filename[256]; // 存储文件名
+};
+
+
 #pragma pack(push)	// 保存对齐的长度到栈中
 #pragma pack(1)		// 对齐长度为1
 // 解析网络数据包
@@ -49,6 +68,12 @@ public:
 	~CPacket() {}
 
 	int size() { return length + 6; }	// 返回整个包的大小
+
+	const char* GetPData()
+	{
+		return data.c_str();
+	}
+
 	const char* packData()	// 返回一个包含整个包的数据,没有其他无用的东西
 	{
 		pack_data.resize(size());

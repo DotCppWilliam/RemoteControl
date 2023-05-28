@@ -22,8 +22,8 @@ public:
 	virtual void DoDataExchange(CDataExchange* pDX);	// DDX/DDV 支持
 	
 private:
-	int SendCmdPacket(command cmd, BYTE* data = nullptr, size_t len = 0);
-
+	int SendCmdPacket(command cmd, bool autoClosed = true, BYTE* data = nullptr, size_t len = 0);
+	CString GetPath(HTREEITEM hTree);
 // 实现
 protected:
 	HICON m_hIcon;
@@ -41,4 +41,6 @@ public:
 	afx_msg void OnBnClickedFileinfo();
 private:
 	CTreeCtrl m_dirTree;
+public:
+	afx_msg void OnNMDblclkTreeDir(NMHDR* pNMHDR, LRESULT* pResult);
 };

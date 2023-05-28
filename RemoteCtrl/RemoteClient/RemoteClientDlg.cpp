@@ -65,17 +65,20 @@ void CRemoteClientDlg::DoDataExchange(CDataExchange* pDX)
 	CDialogEx::DoDataExchange(pDX);
 	DDX_IPAddress(pDX, ID_IPADDR_SERV, m_serv_adr);
 	DDX_Text(pDX, ID_PORT, m_port);
-	DDX_Control(pDX, IDC_TREE1, m_dirTree);
+	DDX_Control(pDX, IDC_TREE_DIR, m_dirTree);
 }
 
 
 
-int CRemoteClientDlg::SendCmdPacket(command cmd, BYTE* data, size_t len)
+int CRemoteClientDlg::SendCmdPacket(command cmd, 
+	bool autoClosed = true, 
+	BYTE* data = nullptr, 
+	size_t len = 0)
 {
 	UpdateData();
 	bool ret;
 	CClientSocket* pClient = CClientSocket::getInstance();
-	ret = pClient->InitSocket(m_serv_adr, atoi(CW2A(m_port.GetBuffer())));
+	ret = pClient->InitSocket(m_serv_adr, atoi(m_port.GetBuffer()));
 	if (!ret)
 	{
 		AfxMessageBox(_T("控制端: 网络初始化失败"));
@@ -94,7 +97,8 @@ int CRemoteClientDlg::SendCmdPacket(command cmd, BYTE* data, size_t len)
 	}
 	TRACE("客户端收到被控端发送过来的命令: %d\r\n", pClient->GetPacket().cmd);
 
-	pClient->CloseSocket();
+	if (autoClosed)
+		pClient->CloseSocket();
 
 	return 0;
 }
@@ -105,6 +109,7 @@ BEGIN_MESSAGE_MAP(CRemoteClientDlg, CDialogEx)
 	ON_WM_QUERYDRAGICON()
 	ON_BN_CLICKED(ID_BTN_TEST, &CRemoteClientDlg::OnBnClickedBtnTest)
 	ON_BN_CLICKED(IDC_FILEINFO, &CRemoteClientDlg::OnBnClickedFileinfo)
+	ON_NOTIFY(NM_DBLCLK, IDC_TREE_DIR, &CRemoteClientDlg::OnNMDblclkTreeDir)
 END_MESSAGE_MAP()
 
 
@@ -230,14 +235,52 @@ void CRemoteClientDlg::OnBnClickedFileinfo()
 		if (drivers[i] == ',')
 		{
 			dr += ":";
-			CString str(dr.c_str());
-			TRACE("控制端: %s\r\n", str);
-			m_dirTree.InsertItem((LPCTSTR)str, TVI_ROOT, TVI_LAST);
+			TRACE("控制端: %s\r\n", dr);
+			m_dirTree.InsertItem(dr.c_str(), TVI_ROOT, TVI_LAST);
 			
 			dr.clear();
 			continue;
 		}
 		dr += drivers[i];
 	}
+	m_dirTree.InsertItem("控制", TVI_ROOT, TVI_LAST);
+}
 
+CString CRemoteClientDlg::GetPath(HTREEITEM hTree)
+{
+	CString strRet, strTmp;
+	do
+	{
+		strTmp = m_dirTree.GetItemText(hTree);
+		strRet = strTmp + '\\' + strRet;
+		hTree = m_dirTree.GetParentItem(hTree);
+	} while (hTree != nullptr);
+	return strRet;
+}
+
+
+void CRemoteClientDlg::OnNMDblclkTreeDir(NMHDR* pNMHDR, LRESULT* pResult)
+{
+	// TODO: 在此添加控件通知处理程序代码
+	*pResult = 0;
+
+	CPoint ptMouse;
+	GetCursorPos(&ptMouse);	// 获取当前鼠标坐标位置
+	m_dirTree.ScreenToClient(&ptMouse);	// 将鼠标从屏幕坐标系转换为树形控件的客户区坐标系
+	HTREEITEM hTreeSelected = m_dirTree.HitTest(ptMouse, 0);	// 检测当前位置是否在树形控件的某个节点上
+	if (hTreeSelected == nullptr)
+		return;
+
+
+	CString strPath = GetPath(hTreeSelected);
+	int ret = SendCmdPacket(CMD_DLFILE, false, (BYTE*)(LPCTSTR)strPath, strPath.GetLength());
+	SFileInfo* pInfo = (SFileInfo*)CClientSocket::getInstance()->GetPacket().GetPData();
+	CClientSocket* pClient = CClientSocket::getInstance();
+	while (pInfo->hasNext)
+	{
+		int ret = pClient->DealCommand();
+		
+		// 处理收到的数据
+	}
+	pClient->CloseSocket();
 }

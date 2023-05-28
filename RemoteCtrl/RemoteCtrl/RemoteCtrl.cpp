@@ -35,22 +35,7 @@ unsigned threadId = 0;  // 线程Id
 
 using namespace std;
 
-// 存储文件信息
-struct SFileInfo
-{
-    SFileInfo() :
-        isDir(false), 
-        isValid(true),
-        hasNext(true)
-    {
-        memset(filename, 0, sizeof(filename));
-    }
 
-    bool isDir;     // 是否是目录, 0: 否 1: 是
-    bool isValid;   // 是否有效 
-    bool hasNext;   // 是否还有子目录 
-    char filename[256]; // 存储文件名
-};
 
 
 /* 获取所有的磁盘符 */
@@ -519,8 +504,6 @@ int main()
                     ret = ExecuteCmd(pserv->GetPacket().cmd);
                     if (ret != 0)
                         TRACE("执行命令失败: %d ret=%d\r\n", pserv->GetPacket().cmd, ret);
-                    pserv->CloseSocket();   // 短连接
-                    
                 }
             }
             
