@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include "ClientSocket.h"
 
 // CRemoteClientDlg 对话框
 class CRemoteClientDlg : public CDialogEx
@@ -19,7 +20,9 @@ public:
 
 	protected:
 	virtual void DoDataExchange(CDataExchange* pDX);	// DDX/DDV 支持
-
+	
+private:
+	int SendCmdPacket(command cmd, BYTE* data = nullptr, size_t len = 0);
 
 // 实现
 protected:
@@ -35,4 +38,7 @@ public:
 	afx_msg void OnBnClickedBtnTest();
 	DWORD m_serv_adr;
 	CString m_port;
+	afx_msg void OnBnClickedFileinfo();
+private:
+	CTreeCtrl m_dirTree;
 };

@@ -48,20 +48,26 @@ CPacket::CPacket(const BYTE* pdata, size_t& size, CPacket& packet)
 	// 4. 解析数据
 	if (packet.length > 4)	// 大于4表示除了控制命令和校验和,还有数据需要解析
 	{
-		packet.data.resize(length - 2 - 2);	// 分配存储数据的大小
-		memcpy((void*)packet.data.c_str(), pdata + i, length - 4);
-		i += length - 4;	// 指向和校验的地址
+		packet.data.resize(packet.length - 2 - 2);	// 分配存储数据的大小
+		// memcpy有问题
+		memcpy((void*)packet.data.c_str(), pdata + i, packet.length - 4);
+		i += packet.length - 4;	// 指向和校验的地址
 	}
 
 	// 5. 解析校验和
+	if (i > size)	// 解析失败,并没有接收完整的数据包
+	{
+		size = 0;
+		return;
+	}
 	packet.sum = *(WORD*)(pdata + i);
 	i += 2; // 指向校验和的位置
 
-	// 计算校验和,然后和包的校验和匹配
+	// 计算校验和,然后和包的校验和匹配3
 	WORD data_sum = 0;
-	size_t dsize = data.size();
-	for (int j = 0; j < dsize; i++)
-		data_sum += BYTE(data[j]) & 0xFF;
+	size_t dsize = packet.data.size();
+	for (int j = 0; j < dsize; j++)
+		data_sum += BYTE(packet.data[j]) & 0xFF;
 
 	if (data_sum == packet.sum)	// 校验和匹配成功,发送过程数据无误
 	{

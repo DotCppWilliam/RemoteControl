@@ -65,6 +65,38 @@ void CRemoteClientDlg::DoDataExchange(CDataExchange* pDX)
 	CDialogEx::DoDataExchange(pDX);
 	DDX_IPAddress(pDX, ID_IPADDR_SERV, m_serv_adr);
 	DDX_Text(pDX, ID_PORT, m_port);
+	DDX_Control(pDX, IDC_TREE1, m_dirTree);
+}
+
+
+
+int CRemoteClientDlg::SendCmdPacket(command cmd, BYTE* data, size_t len)
+{
+	UpdateData();
+	bool ret;
+	CClientSocket* pClient = CClientSocket::getInstance();
+	ret = pClient->InitSocket(m_serv_adr, atoi(CW2A(m_port.GetBuffer())));
+	if (!ret)
+	{
+		AfxMessageBox(_T("控制端: 网络初始化失败"));
+		return -1;
+	}
+
+	CPacket pack(cmd, data, len);
+	ret = pClient->SendData(pack);
+	if (ret)
+		TRACE("客户端发送数据成功\r\n");
+
+	if (pClient->DealCommand() != 0)
+	{
+		pClient->CloseSocket();
+		return -1;
+	}
+	TRACE("客户端收到被控端发送过来的命令: %d\r\n", pClient->GetPacket().cmd);
+
+	pClient->CloseSocket();
+
+	return 0;
 }
 
 BEGIN_MESSAGE_MAP(CRemoteClientDlg, CDialogEx)
@@ -72,6 +104,7 @@ BEGIN_MESSAGE_MAP(CRemoteClientDlg, CDialogEx)
 	ON_WM_PAINT()
 	ON_WM_QUERYDRAGICON()
 	ON_BN_CLICKED(ID_BTN_TEST, &CRemoteClientDlg::OnBnClickedBtnTest)
+	ON_BN_CLICKED(IDC_FILEINFO, &CRemoteClientDlg::OnBnClickedFileinfo)
 END_MESSAGE_MAP()
 
 
@@ -168,22 +201,43 @@ HCURSOR CRemoteClientDlg::OnQueryDragIcon()
 
 void CRemoteClientDlg::OnBnClickedBtnTest()
 {
-	UpdateData();
-	bool ret;
-	CClientSocket* pClient = CClientSocket::getInstance();
-	ret = pClient->InitSocket(m_serv_adr, atoi(CW2A( m_port.GetBuffer())));
-	if (ret)
-		TRACE("客户端连接成功\r\n");
+	SendCmdPacket(command(1024));
+}
 
-	CPacket pack(1024, nullptr, 0);
-	ret = pClient->SendData(pack);
-	if (ret)
-		TRACE("客户端发送数据成功\r\n");
+// 查看对方文件信息
+void CRemoteClientDlg::OnBnClickedFileinfo()
+{
+	// TODO: 在此添加控件通知处理程序代码
+	int ret = SendCmdPacket(CMD_DRIVER);
+	if (ret != 0)
+	{
+		AfxMessageBox(_T("控制端: 命令处理失败!!!\r\n"));
+		return;
+	}
 
-	Sleep(4000);
+	CClientSocket* pclient = CClientSocket::getInstance();
+	std::string drivers = pclient->GetPacket().data;
+	std::string dr;
 
-	pClient->DealCommand();
-	TRACE("客户端收到被控端发送过来的命令: %d\r\n", pClient->GetPacket().cmd);
 
-	pClient->CloseSocket();
+	m_dirTree.DeleteAllItems();
+
+
+	// 插入中文字符会乱码
+	size_t size = drivers.size();
+	for (size_t i = 0; i < size; i++)
+	{
+		if (drivers[i] == ',')
+		{
+			dr += ":";
+			CString str(dr.c_str());
+			TRACE("控制端: %s\r\n", str);
+			m_dirTree.InsertItem((LPCTSTR)str, TVI_ROOT, TVI_LAST);
+			
+			dr.clear();
+			continue;
+		}
+		dr += drivers[i];
+	}
+
 }

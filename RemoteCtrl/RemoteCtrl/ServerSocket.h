@@ -86,6 +86,7 @@ public:
 	void CloseSocket()
 	{
 		closesocket(m_client);
+		m_client = INVALID_SOCKET;
 	}
 
 	/* 初始化socket */
@@ -107,6 +108,10 @@ public:
 	bool SendData(CPacket& packet)
 	{
 		if (m_client == INVALID_SOCKET) return false;
+
+
+		const char* ptr = packet.packData();
+		size_t size = packet.size();
 		return send(m_client, packet.packData(), packet.size(), 0) > 0;
 	}
 
@@ -150,7 +155,7 @@ private:
 	}
 	~CServerSocket() 
 	{
-		closesocket(m_socket);
+		TRACE("-------------> 被控端析构\r\n");
 		WSACleanup();
 	}
 
@@ -177,6 +182,7 @@ private:
 			CServerSocket* tmp = m_instance;
 			m_instance = nullptr;
 			delete tmp;
+			TRACE("-------------> 被控端: 执行了CHelper析构\r\n");
 		}
 	}
 // 私有类
@@ -189,6 +195,7 @@ private:
 		}
 		~CHelper()
 		{
+			TRACE("-------------> 被控端: 执行了CHelper析构\r\n");
 			CServerSocket::releaseInstance();
 		}
 	};

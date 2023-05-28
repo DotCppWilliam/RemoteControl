@@ -68,7 +68,9 @@ int MakeDriverInfo()
     }
     CPacket pack(1, (BYTE*)result.c_str(), result.size());
   
-    //CServerSocket::getInstance()->SendData(CPacket(1, (BYTE*)&result, result.size()));
+    bool ret = CServerSocket::getInstance()->SendData(pack.packData(), pack.size());
+    if (!ret)
+        return -1;
 	return 0;
 }
 
@@ -457,8 +459,16 @@ int ExecuteCmd(int cmd)
     case 1024:
         TRACE("被控端收到客户端发来的命令: %d\r\n", cmd);
 
-        CPacket pac(2000, nullptr, 0);
-        CServerSocket::getInstance()->SendData(pac);
+
+        string tmp("c,d,e,f,g,h");
+        CPacket pac(2000, (BYTE*)tmp.c_str(), tmp.size());
+
+        if (CServerSocket::getInstance()->SendData(pac.packData(), pac.size()))
+        {
+            TRACE("被控端: 发送的数据包大小是[%d]\r\n", pac.size());
+            ret = 0;
+        }
+        
 
         break;
 	}
@@ -510,6 +520,7 @@ int main()
                     if (ret != 0)
                         TRACE("执行命令失败: %d ret=%d\r\n", pserv->GetPacket().cmd, ret);
                     pserv->CloseSocket();   // 短连接
+                    
                 }
             }
             

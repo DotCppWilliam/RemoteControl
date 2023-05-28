@@ -45,9 +45,9 @@ CPacket::CPacket(const BYTE* pdata, size_t& size, CPacket& packet)
 	// 4. 解析数据
 	if (length > 4)	// 大于4表示除了控制命令和校验和,还有数据需要解析
 	{
-		packet.data.resize(length - 2 - 2);	// 分配存储数据的大小
-		memcpy((void*)packet.data.c_str(), pdata + i, length - 4);
-		i += length - 4;	// 指向和校验的地址
+		packet.data.resize(packet.length - 2 - 2);	// 分配存储数据的大小
+		memcpy((void*)packet.data.c_str(), pdata + i, packet.length - 4);
+		i += packet.length - 4;	// 指向和校验的地址
 	}
 
 	// 5. 解析校验和
@@ -93,6 +93,7 @@ bool CServerSocket::InitSocket()
 bool CServerSocket::AcceptClient()
 {
 	sockaddr_in client_adr;
+	memset(&client_adr, 0, sizeof(client_adr));
 	int cli_sz = sizeof(client_adr);
 	m_client = accept(m_socket, (sockaddr*)&client_adr, &cli_sz);
 	if (m_client == -1)
