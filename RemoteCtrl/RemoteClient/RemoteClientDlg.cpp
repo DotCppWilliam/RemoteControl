@@ -115,6 +115,7 @@ BEGIN_MESSAGE_MAP(CRemoteClientDlg, CDialogEx)
 	ON_BN_CLICKED(IDC_FILEINFO, &CRemoteClientDlg::OnBnClickedFileinfo)
 	ON_NOTIFY(NM_DBLCLK, IDC_TREE_DIR, &CRemoteClientDlg::OnNMDblclkTreeDir)
 	ON_NOTIFY(NM_CLICK, IDC_TREE_DIR, &CRemoteClientDlg::OnNMClickTreeDir)
+	ON_NOTIFY(NM_RCLICK, IDC_LIST_FILE, &CRemoteClientDlg::OnNMRClickListFile)
 END_MESSAGE_MAP()
 
 
@@ -351,4 +352,30 @@ void CRemoteClientDlg::OnNMClickTreeDir(NMHDR* pNMHDR, LRESULT* pResult)
 {
 	*pResult = 0;
 	LoadFileInfo(); // 显示目录和文件信息
+}
+
+
+void CRemoteClientDlg::OnNMRClickListFile(NMHDR* pNMHDR, LRESULT* pResult)
+{
+	LPNMITEMACTIVATE pNMItemActivate = reinterpret_cast<LPNMITEMACTIVATE>(pNMHDR);
+	// TODO: 在此添加控件通知处理程序代码
+	*pResult = 0;
+
+	CPoint ptMouse, ptList;
+	GetCursorPos(&ptMouse);
+	ptList = ptMouse;
+	m_list.ScreenToClient(&ptList);
+	int listSel = m_list.HitTest(ptList);
+	if (listSel < 0) return;
+
+	CMenu menu;
+	menu.LoadMenu(IDR_MENU_RCLICK);
+	CMenu* pPupup = menu.GetSubMenu(0);
+	if (pPupup != nullptr)
+	{
+		pPupup->TrackPopupMenu(TPM_LEFTALIGN | TPM_RIGHTBUTTON, 
+			ptMouse.x,
+			ptMouse.y,
+			this);
+	}
 }
