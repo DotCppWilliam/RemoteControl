@@ -34,11 +34,11 @@ CPacket::CPacket(const BYTE* pdata, size_t& size, CPacket& packet)
 	// 2. 解析包的长度
 	packet.length = *(DWORD*)(pdata + i);
 	i += 4;	// 跳过包的长度,指向控制命令的地址
-	if (length + i > size)	// 包未完全收到. 则返回,解析失败
-	{
-		size = 0;
-		return;
-	}
+	//if (packet.length + i > size)	// 包未完全收到. 则返回,解析失败
+	//{
+	//	size = 0;
+	//	return;
+	//}
 
 
 	// 3. 解析控制命令
@@ -49,7 +49,6 @@ CPacket::CPacket(const BYTE* pdata, size_t& size, CPacket& packet)
 	if (packet.length > 4)	// 大于4表示除了控制命令和校验和,还有数据需要解析
 	{
 		packet.data.resize(packet.length - 2 - 2);	// 分配存储数据的大小
-		// memcpy有问题
 		memcpy((void*)packet.data.c_str(), pdata + i, packet.length - 4);
 		i += packet.length - 4;	// 指向和校验的地址
 	}
@@ -145,8 +144,7 @@ int CClientSocket::DealCommand()
 	if (m_socket == INVALID_SOCKET) return -1;
 
 	char* buffer = m_buffer.data();
-	memset(buffer, 0, BUFFER_SIZE);
-	size_t index = 0;
+	//memset(buffer, 0, BUFFER_SIZE);
 	while (true)
 	{
 		size_t len = recv(m_socket, buffer + index, sizeof(buffer), 0);
@@ -160,7 +158,7 @@ int CClientSocket::DealCommand()
 		{
 			// 可优化,解决拷贝
 			memmove(buffer, buffer + len, BUFFER_SIZE - len);
-			index -= len;
+			index = index - len;
 			return 0;
 		}
 	}

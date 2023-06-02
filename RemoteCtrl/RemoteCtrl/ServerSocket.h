@@ -29,16 +29,49 @@ struct SFileInfo
 {
 	SFileInfo() :
 		isDir(false),
-		isValid(true),
-		hasNext(true)
+		isValid(false),
+		hasNext(false)
 	{
 		memset(filename, 0, sizeof(filename));
+	}
+
+	void SetPData()
+	{
+		pdata.resize(3 + strlen(filename));
+		char* ptr = (char*)pdata.c_str();
+
+		ptr[0] = isDir;
+		ptr[1] = isValid;
+		ptr[2] = hasNext;
+
+		ptr += 3;
+		memcpy(ptr, filename, strlen(filename));
+	}
+
+	size_t Size() 
+	{ 
+		return pdata.size(); 
+	}
+	const char* GetPData()
+	{
+		return pdata.c_str();
+	}
+
+	void ClearPData()
+	{
+		pdata.clear();
+		pdata.resize(3);
+		pdata[0] = false;
+		pdata[1] = false;
+		pdata[2] = false;
 	}
 
 	bool isDir;     // 是否是目录, 0: 否 1: 是
 	bool isValid;   // 是否有效 
 	bool hasNext;   // 是否还有子目录 
 	char filename[256]; // 存储文件名
+
+	std::string pdata;	// 返回数据包
 };
 
 #pragma pack(push)	// 保存对齐的长度到栈中

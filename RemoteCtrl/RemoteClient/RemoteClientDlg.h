@@ -24,6 +24,9 @@ public:
 private:
 	int SendCmdPacket(command cmd, bool autoClosed = true, BYTE* data = nullptr, size_t len = 0);
 	CString GetPath(HTREEITEM hTree);
+	void DelTreeChildItem(HTREEITEM hTree);
+	void LoadFileInfo();
+
 // 实现
 protected:
 	HICON m_hIcon;
@@ -43,4 +46,6 @@ private:
 	CTreeCtrl m_dirTree;
 public:
 	afx_msg void OnNMDblclkTreeDir(NMHDR* pNMHDR, LRESULT* pResult);
+	afx_msg void OnNMClickTreeDir(NMHDR* pNMHDR, LRESULT* pResult);
+	CListCtrl m_list;	
 };

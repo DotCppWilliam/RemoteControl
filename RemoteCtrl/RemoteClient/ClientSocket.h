@@ -121,6 +121,8 @@ public:
 		{
 			closesocket(m_socket);
 			m_socket = INVALID_SOCKET;
+			m_buffer.clear();
+			index = 0;
 		}
 	}
 
@@ -137,10 +139,6 @@ public:
 	bool SendData(CPacket& packet)
 	{
 		if (m_socket == INVALID_SOCKET) return false;
-
-		TRACE("客户端发送数据大小: %d\r\n", packet.size());
-		TRACE("客户端套接字: %d\r\n", m_socket);
-		const char* ptr = packet.packData();
 		return send(m_socket, packet.packData(), packet.size(), 0) > 0;
 	}
 
@@ -234,6 +232,7 @@ private:
 	SOCKET m_socket = INVALID_SOCKET;	// 监听套接字
 	CPacket m_packet;
 	std::vector<char> m_buffer;
+	size_t index = 0;
 
 	static CClientSocket* m_instance;
 	static CHelper m_helper;

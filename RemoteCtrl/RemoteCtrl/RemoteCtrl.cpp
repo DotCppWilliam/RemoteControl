@@ -53,7 +53,7 @@ int MakeDriverInfo()
     }
     CPacket pack(1, (BYTE*)result.c_str(), result.size());
   
-    bool ret = CServerSocket::getInstance()->SendData(pack.packData(), pack.size());
+    bool ret = CServerSocket::getInstance()->SendData(pack);
     if (!ret)
         return -1;
 	return 0;
@@ -63,20 +63,20 @@ int MakeDriverInfo()
 /* 获取指定目录的所有文件信息 */
 int MakeDirInfo()
 {
+    TRACE("--------------------------> 被控端: 获取所有文件信息\r\n");
     std::string path;
+    SFileInfo finfo;
     if (CServerSocket::getInstance()->GetFilePath(path) == false)   // 获取包数据中的目录
     {
+		// 给控制端发送回应,无法切换到指定目录
+		CPacket pack(CMD_DIR, (BYTE*)&finfo, sizeof(finfo));
+		CServerSocket::getInstance()->SendData(pack);
         OutputDebugString(_T("当前命令不是获取文件列表,解析命令失败!!!"));
         return -1;
     }
 
     if (_chdir(path.c_str()) != 0)  // 切换到指定目录
     {
-        SFileInfo finfo;
-        finfo.isValid = false;  // 无效的
-        finfo.isDir = true;     // 是个目录
-        finfo.hasNext = false;  // 没有子目录或文件
-        memcpy(finfo.filename, path.c_str(), path.size());
         // 给控制端发送回应,无法切换到指定目录
         CPacket pack(CMD_DIR, (BYTE*)&finfo, sizeof(finfo));
         CServerSocket::getInstance()->SendData(pack);
@@ -89,25 +89,39 @@ int MakeDirInfo()
     _finddata_t fdata;
     if ((hfind = _findfirst("*", &fdata)) == -1)  // 查找指定目录的所有文件 通配符 *
     {
+		// 给控制端发送回应,无法切换到指定目录
+		CPacket pack(CMD_DIR, (BYTE*)&finfo, sizeof(finfo));
+		CServerSocket::getInstance()->SendData(pack);
         OutputDebugString(_T("没有找到任何文件!!!"));
         return -3;
     }
-
+    TRACE(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\r\n");
     do // 获取指定目录的所有文件信息给控制端
     {
-        SFileInfo finfo;
+        // 过滤掉..和. 不把这两个发送过去,没有用,浪费带宽
+        if (strcmp(fdata.name, ".") == 0 || strcmp(fdata.name, "..") == 0)
+            continue;
+
+        finfo.hasNext = true;
+        finfo.isValid = true;
         finfo.isDir = (fdata.attrib & _A_SUBDIR) != 0;  // 判断是否是目录
+        memset(finfo.filename, 0, sizeof(finfo.filename) / sizeof(char));
         memcpy(finfo.filename, fdata.name, strlen(fdata.name));
-        CPacket pack(CMD_DIR, (BYTE*)&finfo, sizeof(finfo));
+        finfo.SetPData();
+        CPacket pack(CMD_DIR, (BYTE*)finfo.GetPData(), finfo.Size());
+        TRACE("被控端 发送文件信息: [%s] [isDir: %s] [数据包大小: %d] [hasNext: %s]\r\n", finfo.filename, finfo.isDir ? "是" : "否", pack.size(), finfo.hasNext ? "是" : "否");
         CServerSocket::getInstance()->SendData(pack);
     } while (!_findnext(hfind, &fdata));
+    TRACE(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\r\n");
 
     // 指定目录遍历完,给控制端发送解析完成的响应
-    SFileInfo finfo;
     finfo.hasNext = false;
-	CPacket pack(CMD_DIR, (BYTE*)&finfo, sizeof(finfo));
-	CServerSocket::getInstance()->SendData(pack);
-
+    finfo.ClearPData();
+	CPacket pack(CMD_DIR, (BYTE*)finfo.GetPData(), finfo.Size());
+	bool ret = CServerSocket::getInstance()->SendData(pack);
+    if (ret)
+        TRACE("客户端: 成功发送最后一个响应数据; 数据包大小: [%d] [hasNext: %s]\r\n", pack.size(), finfo.hasNext ? "是" : "否");
+    TRACE("--------------------------> 被控端: 获取所有文件信息\r\n");
     return 0;
 }
 
@@ -441,21 +455,6 @@ int ExecuteCmd(int cmd)
 	case CMD_UNLOCK_MACHINE:
         ret = UnLockMachine();// 解锁
 		break;
-    case 1024:
-        TRACE("被控端收到客户端发来的命令: %d\r\n", cmd);
-
-
-        string tmp("c,d,e,f,g,h");
-        CPacket pac(2000, (BYTE*)tmp.c_str(), tmp.size());
-
-        if (CServerSocket::getInstance()->SendData(pac.packData(), pac.size()))
-        {
-            TRACE("被控端: 发送的数据包大小是[%d]\r\n", pac.size());
-            ret = 0;
-        }
-        
-
-        break;
 	}
     return ret;
 }

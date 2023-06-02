@@ -9,6 +9,7 @@
 #include "afxdialogex.h"
 #include "ClientSocket.h"
 #include <atlconv.h>
+#include "locale.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -58,6 +59,8 @@ CRemoteClientDlg::CRemoteClientDlg(CWnd* pParent /*=nullptr*/)
 	, m_port(_T(""))
 {
 	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
+
+
 }
 
 void CRemoteClientDlg::DoDataExchange(CDataExchange* pDX)
@@ -66,14 +69,15 @@ void CRemoteClientDlg::DoDataExchange(CDataExchange* pDX)
 	DDX_IPAddress(pDX, ID_IPADDR_SERV, m_serv_adr);
 	DDX_Text(pDX, ID_PORT, m_port);
 	DDX_Control(pDX, IDC_TREE_DIR, m_dirTree);
+	DDX_Control(pDX, IDC_LIST_FILE, m_list);
 }
 
 
 
 int CRemoteClientDlg::SendCmdPacket(command cmd, 
-	bool autoClosed = true, 
-	BYTE* data = nullptr, 
-	size_t len = 0)
+	bool autoClosed, 
+	BYTE* data, 
+	size_t len)
 {
 	UpdateData();
 	bool ret;
@@ -110,6 +114,7 @@ BEGIN_MESSAGE_MAP(CRemoteClientDlg, CDialogEx)
 	ON_BN_CLICKED(ID_BTN_TEST, &CRemoteClientDlg::OnBnClickedBtnTest)
 	ON_BN_CLICKED(IDC_FILEINFO, &CRemoteClientDlg::OnBnClickedFileinfo)
 	ON_NOTIFY(NM_DBLCLK, IDC_TREE_DIR, &CRemoteClientDlg::OnNMDblclkTreeDir)
+	ON_NOTIFY(NM_CLICK, IDC_TREE_DIR, &CRemoteClientDlg::OnNMClickTreeDir)
 END_MESSAGE_MAP()
 
 
@@ -202,17 +207,17 @@ HCURSOR CRemoteClientDlg::OnQueryDragIcon()
 	return static_cast<HCURSOR>(m_hIcon);
 }
 
-#include <string>
+
 
 void CRemoteClientDlg::OnBnClickedBtnTest()
 {
 	SendCmdPacket(command(1024));
 }
 
-// 查看对方文件信息
+// 获取对方的所有磁盘符
 void CRemoteClientDlg::OnBnClickedFileinfo()
 {
-	// TODO: 在此添加控件通知处理程序代码
+	setlocale(LC_CTYPE, "chs");
 	int ret = SendCmdPacket(CMD_DRIVER);
 	if (ret != 0)
 	{
@@ -243,9 +248,15 @@ void CRemoteClientDlg::OnBnClickedFileinfo()
 		}
 		dr += drivers[i];
 	}
-	m_dirTree.InsertItem("控制", TVI_ROOT, TVI_LAST);
+
+	if (!dr.empty())
+	{
+		dr += ":";
+		m_dirTree.InsertItem(dr.c_str(), TVI_ROOT, TVI_LAST);
+	}
 }
 
+/* 解析出对方的路径返回 */
 CString CRemoteClientDlg::GetPath(HTREEITEM hTree)
 {
 	CString strRet, strTmp;
@@ -258,29 +269,86 @@ CString CRemoteClientDlg::GetPath(HTREEITEM hTree)
 	return strRet;
 }
 
-
-void CRemoteClientDlg::OnNMDblclkTreeDir(NMHDR* pNMHDR, LRESULT* pResult)
+/* 删除当前节点的所有子节点 */
+void CRemoteClientDlg::DelTreeChildItem(HTREEITEM hTree)
 {
-	// TODO: 在此添加控件通知处理程序代码
-	*pResult = 0;
+	HTREEITEM hSub = nullptr;
+	do
+	{
+		hSub = m_dirTree.GetChildItem(hTree);
+		if (hSub != nullptr) m_dirTree.DeleteItem(hSub);
+	} while (hSub != nullptr);
+}
 
+/* 获取对方盘符的所有目录或文件信息 */
+void CRemoteClientDlg::LoadFileInfo()
+{
 	CPoint ptMouse;
 	GetCursorPos(&ptMouse);	// 获取当前鼠标坐标位置
 	m_dirTree.ScreenToClient(&ptMouse);	// 将鼠标从屏幕坐标系转换为树形控件的客户区坐标系
-	HTREEITEM hTreeSelected = m_dirTree.HitTest(ptMouse, 0);	// 检测当前位置是否在树形控件的某个节点上
+	// 判断是否命中了Tree的某个节点,并返回标识符HTREEITEM
+	HTREEITEM hTreeSelected = m_dirTree.HitTest(ptMouse, 0);
 	if (hTreeSelected == nullptr)
 		return;
 
+	// 以下代码用来判断是否点击的是文件，而不是目录或某个盘符
+	// 但是有问题,需要重新整理
+	/*if (m_dirTree.GetChildItem(hTreeSelected) == NULL)
+		return;*/
+
+	m_list.DeleteAllItems();
+	DelTreeChildItem(hTreeSelected);
 
 	CString strPath = GetPath(hTreeSelected);
-	int ret = SendCmdPacket(CMD_DLFILE, false, (BYTE*)(LPCTSTR)strPath, strPath.GetLength());
+	TRACE("----------> 对方目录: %s\r\n", strPath);
+	TRACE("------------------------------------------------> 控制端: 接收文件信息 开始\r\n");
+	int ret = SendCmdPacket(CMD_DIR, false, (BYTE*)(LPCTSTR)strPath, strPath.GetLength());
 	SFileInfo* pInfo = (SFileInfo*)CClientSocket::getInstance()->GetPacket().GetPData();
+	TRACE("控制端: [%s] [isDir: %s] [数据包大小: %d] [hasNext: %s]\r\n", pInfo->filename, pInfo->isDir ? "是" : "否", CClientSocket::getInstance()->GetPacket().size(),
+		pInfo->hasNext ? "是" : "否");
 	CClientSocket* pClient = CClientSocket::getInstance();
+	
 	while (pInfo->hasNext)
 	{
+		// 目录显示在左侧目录信息中
+		if (pInfo->isDir)	
+		{
+			HTREEITEM hTmp = m_dirTree.InsertItem(pInfo->filename, hTreeSelected, TVI_LAST);
+			m_dirTree.InsertItem("", hTmp, TVI_LAST);
+
+			TRACE("控制端: [%s] [isDir: %s] [数据包大小: %d] [hasNext: %s]\r\n", pInfo->filename, pInfo->isDir ? "是" : "否", CClientSocket::getInstance()->GetPacket().size(),
+				pInfo->hasNext ? "是" : "否");
+		}
+		else
+		{
+			// 文件信息显示在右侧文件信息中
+			m_list.InsertItem(0, pInfo->filename);
+			TRACE("控制端: [%s] [isDir: %s] [数据包大小: %d] [hasNext: %s]\r\n", pInfo->filename, pInfo->isDir ? "是" : "否", CClientSocket::getInstance()->GetPacket().size(),
+				pInfo->hasNext ? "是" : "否");
+		}
+
 		int ret = pClient->DealCommand();
-		
-		// 处理收到的数据
+		if (ret != 0)
+			break;
+		pInfo = (SFileInfo*)CClientSocket::getInstance()->GetPacket().GetPData();
+		TRACE("控制端: [%s] [isDir: %s] [数据包大小: %d] [hasNext: %s]\r\n", pInfo->filename, pInfo->isDir ? "是" : "否", CClientSocket::getInstance()->GetPacket().size(),
+			pInfo->hasNext ? "是" : "否");
 	}
+	TRACE("------------------------------------------------> 控制端: 接收文件信息 结束\r\n");
+	m_dirTree.Expand(hTreeSelected, TVE_EXPAND);
 	pClient->CloseSocket();
+}
+
+/* 双击一个节点获取对方这个目录(或盘符)下的所有文件信息 */
+void CRemoteClientDlg::OnNMDblclkTreeDir(NMHDR* pNMHDR, LRESULT* pResult)
+{
+	*pResult = 0;
+	LoadFileInfo();	// 显示目录和文件信息
+}
+
+
+void CRemoteClientDlg::OnNMClickTreeDir(NMHDR* pNMHDR, LRESULT* pResult)
+{
+	*pResult = 0;
+	LoadFileInfo(); // 显示目录和文件信息
 }

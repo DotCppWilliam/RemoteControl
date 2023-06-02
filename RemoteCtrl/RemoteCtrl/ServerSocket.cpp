@@ -31,7 +31,7 @@ CPacket::CPacket(const BYTE* pdata, size_t& size, CPacket& packet)
 	// 2. 解析包的长度
 	packet.length = *(DWORD*)(pdata + i);
 	i += 4;	// 跳过包的长度,指向控制命令的地址
-	if (length + i > size)	// 包未完全收到. 则返回,解析失败
+	if (packet.length + i > size)	// 包未完全收到. 则返回,解析失败
 	{
 		size = 0;
 		return;
@@ -43,7 +43,7 @@ CPacket::CPacket(const BYTE* pdata, size_t& size, CPacket& packet)
 	i += 2;	// 指向包的数据的地址
 
 	// 4. 解析数据
-	if (length > 4)	// 大于4表示除了控制命令和校验和,还有数据需要解析
+	if (packet.length > 4)	// 大于4表示除了控制命令和校验和,还有数据需要解析
 	{
 		packet.data.resize(packet.length - 2 - 2);	// 分配存储数据的大小
 		memcpy((void*)packet.data.c_str(), pdata + i, packet.length - 4);
@@ -51,16 +51,21 @@ CPacket::CPacket(const BYTE* pdata, size_t& size, CPacket& packet)
 	}
 
 	// 5. 解析校验和
+	if (i > size)	// 解析失败,并没有接收完整的数据包
+	{
+		size = 0;
+		return;
+	}
 	packet.sum = *(WORD*)(pdata + i);
 	i += 2; // 指向校验和的位置
 
 	// 计算校验和,然后和包的校验和匹配
 	WORD data_sum = 0;
-	size_t dsize = data.size();
+	size_t dsize = packet.data.size();
 	for (int j = 0; j < dsize; j++)
-		data_sum += BYTE(data[j]) & 0xFF;
+		data_sum += BYTE(packet.data[j]) & 0xFF;
 
-	if (data_sum == sum)	// 校验和匹配成功,发送过程数据无误
+	if (data_sum == packet.sum)	// 校验和匹配成功,发送过程数据无误
 	{
 		size = i;	// (cmd + data + sum) + head + length
 		return;
