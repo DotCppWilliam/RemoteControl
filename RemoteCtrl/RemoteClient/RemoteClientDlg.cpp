@@ -15,6 +15,7 @@
 #define new DEBUG_NEW
 #endif
 
+#pragma warning(disable:4996)  // 对fopen不报错
 
 // 用于应用程序“关于”菜单项的 CAboutDlg 对话框
 
@@ -116,6 +117,9 @@ BEGIN_MESSAGE_MAP(CRemoteClientDlg, CDialogEx)
 	ON_NOTIFY(NM_DBLCLK, IDC_TREE_DIR, &CRemoteClientDlg::OnNMDblclkTreeDir)
 	ON_NOTIFY(NM_CLICK, IDC_TREE_DIR, &CRemoteClientDlg::OnNMClickTreeDir)
 	ON_NOTIFY(NM_RCLICK, IDC_LIST_FILE, &CRemoteClientDlg::OnNMRClickListFile)
+	ON_COMMAND(ID_DL_FILE, &CRemoteClientDlg::OnDLFile)
+	ON_COMMAND(ID_DEL_FILE, &CRemoteClientDlg::OnDelFile)
+	ON_COMMAND(ID_OPEN_FILE, &CRemoteClientDlg::OnOpenFile)
 END_MESSAGE_MAP()
 
 
@@ -378,4 +382,75 @@ void CRemoteClientDlg::OnNMRClickListFile(NMHDR* pNMHDR, LRESULT* pResult)
 			ptMouse.y,
 			this);
 	}
+}
+
+/* 下载文件 */
+void CRemoteClientDlg::OnDLFile()
+{
+	// TODO: 在此添加命令处理程序代码
+	int nListSel = m_list.GetSelectionMark();	// 获取被选中的项的索引
+	CString strFile = m_list.GetItemText(nListSel, 0);	// 获取文件列表控件中被选中项的第一列内容
+	CFileDialog dlg(false, "", strFile, OFN_OVERWRITEPROMPT | OFN_HIDEREADONLY, "", this);
+	
+	if (dlg.DoModal() == IDOK)
+	{
+		FILE* file = fopen(dlg.GetPathName(), "wb+");
+		if (file == nullptr)
+		{
+			AfxMessageBox("本地没有权限保存文件,或者文件无法创建!!!");
+			return;
+		}
+
+
+		HTREEITEM hSel = m_dirTree.GetSelectedItem();	// 获取当前选中的目录树控件中的句柄
+		strFile = GetPath(hSel) + strFile;
+		TRACE("%s\r\n", LPCTSTR(strFile));
+
+		int ret = SendCmdPacket(CMD_DLFILE, false, (BYTE*)(LPCTSTR)strFile, strFile.GetLength());
+		if (ret != 0)
+		{
+			AfxMessageBox("执行下载文件失败!!");
+			TRACE("控制端: 执行下载文件失败 [ret=%d]\r\n", ret);
+			return;
+		}
+		// 获取被控端发送过来的文件大小
+		CClientSocket* pClient = CClientSocket::getInstance();
+		long long pLen = *(long long*)pClient->GetPacket().GetPData();
+		if (pLen == 0)	// 文件下载失败,或者文件长度就是0
+		{
+			AfxMessageBox("文件长度为0或者无法读取文件!!!");
+			return;
+		}
+		TRACE("控制端: 下载文件 [大小: %d]\r\n", pLen);
+		
+		long long count = 0;
+		int i = 0;
+		while (count < pLen)
+		{
+			ret = pClient->DealCommand();
+			if (ret != 0)
+			{
+				AfxMessageBox("传输失败!!!");
+				TRACE("控制端: 下载文件 传输失败\r\n");
+				break;
+			}
+			fwrite(pClient->GetPacket().GetPData(), 1, pClient->GetPacket().dataSize(), file);
+			TRACE("~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 控制端: 下载文件 [%d 文件大小: %d]\r\n", ++i, pClient->GetPacket().dataSize());
+			count += pClient->GetPacket().dataSize();
+		}
+		fclose(file);
+	}
+	CClientSocket::getInstance()->CloseSocket();
+}
+
+/* 删除文件 */
+void CRemoteClientDlg::OnDelFile()
+{
+	// TODO: 在此添加命令处理程序代码
+}
+
+/* 打开文件 */
+void CRemoteClientDlg::OnOpenFile()
+{
+	// TODO: 在此添加命令处理程序代码
 }

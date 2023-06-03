@@ -66,10 +66,12 @@ int MakeDirInfo()
     TRACE("--------------------------> 被控端: 获取所有文件信息\r\n");
     std::string path;
     SFileInfo finfo;
+	
     if (CServerSocket::getInstance()->GetFilePath(path) == false)   // 获取包数据中的目录
     {
 		// 给控制端发送回应,无法切换到指定目录
-		CPacket pack(CMD_DIR, (BYTE*)&finfo, sizeof(finfo));
+        finfo.SetPData();
+		CPacket pack(CMD_DIR, (BYTE*)finfo.GetPData(), finfo.Size());
 		CServerSocket::getInstance()->SendData(pack);
         OutputDebugString(_T("当前命令不是获取文件列表,解析命令失败!!!"));
         return -1;
@@ -78,7 +80,8 @@ int MakeDirInfo()
     if (_chdir(path.c_str()) != 0)  // 切换到指定目录
     {
         // 给控制端发送回应,无法切换到指定目录
-        CPacket pack(CMD_DIR, (BYTE*)&finfo, sizeof(finfo));
+		finfo.SetPData();
+		CPacket pack(CMD_DIR, (BYTE*)finfo.GetPData(), finfo.Size());
         CServerSocket::getInstance()->SendData(pack);
 
         OutputDebugString(_T("没有权限访问目录!!!"));
@@ -144,12 +147,12 @@ int DownloadFile()
 {
 	std::string path;
 	CServerSocket::getInstance()->GetFilePath(path);
-	ShellExecuteA(nullptr, nullptr, path.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
 
     long long dataLen = 0;
     FILE* file = fopen(path.c_str(), "rb");
     if (file == nullptr)
     {
+        // 向控制端发送大小为0,表示被控端打开文件失败
         CPacket pack(CMD_DLFILE, (BYTE*)&dataLen, sizeof(dataLen));
         CServerSocket::getInstance()->SendData(pack);
         return -1;
@@ -158,9 +161,10 @@ int DownloadFile()
     // 向控制端先发送一个文件的大小
     fseek(file, 0, SEEK_END);
     dataLen = _ftelli64(file);
-    CPacket head(CMD_DLFILE, (BYTE*)&dataLen, sizeof(dataLen));
+    TRACE("被控端: 下载文件 [大小: %d]\r\n", dataLen);
+    CPacket pack(CMD_DLFILE, (BYTE*)&dataLen, sizeof(dataLen));
+    CServerSocket::getInstance()->SendData(pack);
     fseek(file, 0, SEEK_SET);
-
 
     char buffer[1024];
     size_t len = 0;

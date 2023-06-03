@@ -67,7 +67,13 @@ public:
 	}
 	~CPacket() {}
 
-	int size() { return length + 6; }	// 返回整个包的大小
+	size_t size() { return length + 6; }		// 返回整个包的大小
+	size_t dataSize()	// 返回数据的大小
+	{ 
+		if (length > 0) 
+			return length - 4; 
+		return 0; 
+	}	
 
 	const char* GetPData()
 	{
