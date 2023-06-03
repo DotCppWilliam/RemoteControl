@@ -10,10 +10,11 @@
 
 enum command {
 	CMD_ERR = -1,
-	CMD_DRIVER = 1,		// CMD_DRIVER: 获取所有的磁盘符
-	CMD_DIR,			// CMD_DIR: 获取指定目录的信息
-	CMD_RUN,			// CMD_RUN: 运行某个文件
-	CMD_DLFILE,			// CMD_DLFILE: 下载某个文件
+	CMD_DRIVER = 1,		// 获取所有的磁盘符
+	CMD_DIR,			// 获取指定目录的信息
+	CMD_RUN,			// 运行某个文件
+	CMD_DLFILE,			// 下载某个文件
+	CMD_DEL,			// 删除文件
 	CMD_SCREEN,			// 屏幕
 	CMD_MOUSE,			// 鼠标操作
 	CMD_LOCK_MACHINE,	// 锁机

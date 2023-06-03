@@ -182,6 +182,13 @@ int DownloadFile()
     return 0;
 }
 
+/* 删除某个文件 */
+int DelFile()
+{
+
+    return 0;
+}
+
 
 /* 获取鼠标 */
 int MouseEvent()
@@ -446,6 +453,9 @@ int ExecuteCmd(int cmd)
 		break;
 	case CMD_DLFILE:    // 下载文件
         ret = DownloadFile();
+		break;
+    case CMD_DEL:       // 删除文件
+        ret = DelFile();
 		break;
 	case CMD_MOUSE:     // 鼠标
         ret = MouseEvent();
