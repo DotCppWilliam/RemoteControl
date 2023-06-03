@@ -172,7 +172,7 @@ public:
 	/* 获取文件信息 */
 	bool GetFilePath(std::string& path)
 	{
-		if (m_packet.cmd >= CMD_DIR && m_packet.cmd <= CMD_DLFILE)
+		if (m_packet.cmd >= CMD_DIR && m_packet.cmd <= CMD_DEL)
 		{
 			path = m_packet.data;
 			return true;

@@ -23,10 +23,10 @@ public:
 	
 private:
 	int SendCmdPacket(command cmd, bool autoClosed = true, BYTE* data = nullptr, size_t len = 0);
-	CString GetPath(HTREEITEM hTree);
+	std::string GetPath(HTREEITEM hTree);
 	void DelTreeChildItem(HTREEITEM hTree);
 	void LoadFileInfo();
-
+	void ShowFileInfo();
 // 实现
 protected:
 	HICON m_hIcon;

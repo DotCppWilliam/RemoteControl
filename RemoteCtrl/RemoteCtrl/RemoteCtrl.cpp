@@ -76,7 +76,6 @@ int MakeDirInfo()
         OutputDebugString(_T("当前命令不是获取文件列表,解析命令失败!!!"));
         return -1;
     }
-
     if (_chdir(path.c_str()) != 0)  // 切换到指定目录
     {
         // 给控制端发送回应,无法切换到指定目录
@@ -185,7 +184,18 @@ int DownloadFile()
 /* 删除某个文件 */
 int DelFile()
 {
-
+    std::string path;
+    CServerSocket::getInstance()->GetFilePath(path);
+    TCHAR sPath[MAX_PATH] = _T("");
+    MultiByteToWideChar(CP_ACP, 0, path.c_str(), path.size(), sPath,
+        sizeof(sPath) / sizeof(TCHAR));
+    //mbstowcs(sPath, path.c_str(), path.size()); // 中文容易乱码
+    DeleteFile(sPath);
+    CPacket pack(CMD_DEL, nullptr, 0);
+    bool ret = CServerSocket::getInstance()->SendData(pack);
+    if (ret)
+        TRACE("被控端: 删除文件成功\r\n");
+    
     return 0;
 }
 

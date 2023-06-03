@@ -57,7 +57,7 @@ public:
 		if (size > 0)
 		{
 			data.resize(size);
-			memcpy((BYTE*)data.c_str(), pdata, size);
+			memcpy((BYTE*)data.c_str(), (BYTE*)pdata, size);
 		}
 		else
 			data.clear();
@@ -146,7 +146,7 @@ public:
 	bool SendData(CPacket& packet)
 	{
 		if (m_socket == INVALID_SOCKET) return false;
-		return send(m_socket, packet.packData(), packet.size(), 0) > 0;
+		return (send(m_socket, packet.packData(), packet.size(), 0) > 0);
 	}
 
 	/* 获取文件信息 */
